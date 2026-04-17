@@ -3,272 +3,255 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Escáner PDF417 optimizado para Cédula de Ciudadanía Colombiana">
+  <meta name="theme-color" content="#0f172a">
   <title>🔬 Scanner PDF417 · Cédula CO</title>
   <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --text: #0f172a; --text-muted: #64748b;
+      --primary: #2563eb; --primary-hover: #1d4ed8; --success: #16a34a;
+      --error: #dc2626; --border: #e2e8f0; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      --radius: 12px; --font: system-ui, -apple-system, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a; --surface: #1e293b; --text: #f1f5f9; --text-muted: #94a3b8;
+        --border: #334155; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+      }
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { 
-      font-family: system-ui, -apple-system, sans-serif; 
-      background: #0f172a; 
-      color: #f1f5f9; 
-      padding: 1rem;
-      line-height: 1.5;
-    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; padding: 1rem; }
     .container { max-width: 800px; margin: 0 auto; }
-    h1 { text-align: center; margin-bottom: 0.5rem; font-size: 1.5rem; }
-    .subtitle { text-align: center; color: #94a3b8; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    header { text-align: center; margin-bottom: 1.5rem; }
+    header h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    header p { color: var(--text-muted); font-size: 0.9rem; }
     
-    .card { 
-      background: #1e293b; 
-      border-radius: 12px; 
-      padding: 1rem; 
-      margin-bottom: 1rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    }
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem; margin-bottom: 1rem; }
     
-    #reader { 
-      width: 100%; 
-      height: 300px; 
-      background: #000; 
-      border-radius: 8px; 
-      overflow: hidden;
-      position: relative;
-    }
-    .guide {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 85%;
-      height: 120px;
-      border: 3px solid #2563eb;
-      border-radius: 8px;
-      pointer-events: none;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
-    }
-    .guide::after {
-      content: 'Alinea el código PDF417 aquí';
-      position: absolute;
-      bottom: -28px;
-      left: 0;
-      width: 100%;
-      text-align: center;
-      color: #fff;
-      font-size: 0.85rem;
-      font-weight: 500;
-    }
+    #video-container { position: relative; width: 100%; height: 320px; background: #000; border-radius: var(--radius); overflow: hidden; }
+    #video-container video { width: 100%; height: 100%; object-fit: cover; }
+    .guide-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; height: 130px; border: 3px solid rgba(37, 99, 235, 0.8); border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); }
+    .guide-overlay::after { content: 'Alinea el código PDF417 aquí'; position: absolute; bottom: -25px; left: 0; width: 100%; text-align: center; color: #fff; font-size: 0.8rem; font-weight: 500; }
     
-    .controls { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
-    button { 
-      padding: 0.7rem 1rem; 
-      border: none; 
-      border-radius: 8px; 
-      font-weight: 600; 
-      cursor: pointer; 
-      transition: all 0.2s;
-      font-size: 0.9rem;
-    }
+    .controls { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    button { padding: 0.6rem 1rem; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; background: var(--primary); color: white; }
+    button:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-primary { background: #2563eb; color: white; flex: 1; }
-    .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
-    .btn-stop { background: #dc2626; color: white; flex: 1; }
-    .btn-stop:hover:not(:disabled) { background: #b91c1c; }
-    .btn-secondary { background: #334155; color: #f1f5f9; }
-    .btn-secondary:hover { background: #475569; }
-    .btn-success { background: #16a34a; color: white; }
-    .btn-success:hover { background: #15803d; }
-    .btn-danger { background: #dc2626; color: white; }
+    button.secondary { background: var(--border); color: var(--text); }
+    button.secondary:hover:not(:disabled) { background: #cbd5e1; }
+    button.danger { background: var(--error); }
+    button.success { background: var(--success); }
     
-    .status { 
-      margin-top: 0.75rem; 
-      padding: 0.5rem; 
-      border-radius: 6px; 
-      font-size: 0.85rem;
-      text-align: center;
-    }
-    .status.error { background: rgba(220, 38, 38, 0.2); color: #f87171; }
-    .status.success { background: rgba(22, 163, 74, 0.2); color: #4ade80; }
-    .status.info { background: rgba(37, 99, 235, 0.2); color: #60a5fa; }
+    .status { margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; }
+    .status.error { color: var(--error); }
+    .status.success { color: var(--success); }
     
-    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #334155; }
-    .tab { 
-      padding: 0.75rem 1.5rem; 
-      background: none; 
-      border: none; 
-      color: #94a3b8; 
-      cursor: pointer; 
-      font-weight: 600;
-      border-bottom: 3px solid transparent;
-      margin-bottom: -2px;
-    }
-    .tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+    .field-grid { display: grid; gap: 0.75rem; margin: 1rem 0; }
+    .field-item { background: var(--bg); padding: 0.75rem; border-radius: 8px; }
+    .field-item strong { display: block; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem; }
+    .field-item span { font-size: 1rem; font-weight: 500; word-break: break-word; }
+    
+    .record-list { list-style: none; margin: 0.5rem 0; max-height: 400px; overflow-y: auto; }
+    .record-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; cursor: pointer; transition: background 0.2s; }
+    .record-item:hover { background: var(--bg); }
+    .record-item:last-child { border-bottom: none; }
+    .record-info { flex: 1; min-width: 0; }
+    .record-doc { font-weight: 600; font-size: 1rem; }
+    .record-name { font-size: 0.85rem; color: var(--text-muted); }
+    .record-date { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .record-actions { display: flex; gap: 0.5rem; }
+    
+    .empty-state { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
+    .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: var(--surface); color: var(--text); padding: 0.75rem 1rem; border-radius: 8px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 1000; border: 1px solid var(--border); }
+    .toast.show { opacity: 1; }
+    
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid var(--border); }
+    .tab { padding: 0.75rem 1.5rem; background: none; border: none; color: var(--text-muted); cursor: pointer; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     
-    .field { 
-      background: #0f172a; 
-      padding: 0.75rem; 
-      border-radius: 8px; 
-      margin-bottom: 0.5rem;
-    }
-    .field-label { color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem; }
-    .field-value { font-size: 1rem; font-weight: 500; }
+    .file-input-wrapper { margin-top: 0.75rem; text-align: center; }
+    .file-input-wrapper label { display: inline-block; padding: 0.5rem 1rem; background: var(--border); color: var(--text); border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+    .file-input-wrapper input { display: none; }
     
-    .record { 
-      background: #0f172a; 
-      padding: 1rem; 
-      border-radius: 8px; 
-      margin-bottom: 0.5rem;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .record:hover { background: #1e293b; }
-    .record-doc { font-weight: 600; font-size: 1.1rem; margin-bottom: 0.25rem; }
-    .record-name { color: #94a3b8; font-size: 0.9rem; margin-bottom: 0.25rem; }
-    .record-date { color: #64748b; font-size: 0.75rem; }
+    .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .result-header h3 { font-size: 1.1rem; }
     
-    .empty { text-align: center; padding: 2rem; color: #64748b; font-style: italic; }
-    .toast { 
-      position: fixed; 
-      bottom: 1rem; 
-      left: 50%; 
-      transform: translateX(-50%); 
-      background: #1e293b; 
-      padding: 0.75rem 1.5rem; 
-      border-radius: 8px; 
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-      opacity: 0; 
-      pointer-events: none; 
-      transition: opacity 0.3s;
-      z-index: 1000;
-      border: 1px solid #334155;
-    }
-    .toast.show { opacity: 1; }
+    #rawData { background: #1e293b; color: #e2e8f0; padding: 0.75rem; border-radius: 8px; font-family: monospace; font-size: 0.75rem; overflow-x: auto; margin: 0.5rem 0; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
     
-    #rawData { 
-      background: #0f172a; 
-      color: #e2e8f0; 
-      padding: 0.75rem; 
-      border-radius: 8px; 
-      font-family: monospace; 
-      font-size: 0.75rem; 
-      overflow-x: auto; 
-      white-space: pre-wrap;
-      margin: 0.5rem 0;
-      max-height: 150px;
-      overflow-y: auto;
-    }
-    
-    .result-header { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      margin-bottom: 1rem;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    
-    @media (max-width: 640px) {
-      #reader { height: 240px; }
+    @media (max-width: 480px) {
+      #video-container { height: 260px; }
       .controls { flex-direction: column; }
       button { width: 100%; }
+      .tabs { overflow-x: auto; }
+      .tab { white-space: nowrap; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🔬 Scanner PDF417 · Cédula CO</h1>
-    <p class="subtitle">Escanea la parte posterior de la cédula colombiana</p>
+    <header>
+      <h1>🔬 Scanner PDF417 · Cédula CO</h1>
+      <p>Escanea la parte posterior de la cédula colombiana</p>
+    </header>
 
     <div class="tabs">
-      <button class="tab active" onclick="showTab('scanner')">📷 Escáner</button>
-      <button class="tab" onclick="showTab('records')">📋 Registros (<span id="recordCount">0</span>)</button>
+      <button class="tab active" onclick="switchTab('scanner')">📷 Escáner</button>
+      <button class="tab" onclick="switchTab('records')">📋 Registros (<span id="totalRecords">0</span>)</button>
     </div>
 
     <div id="scannerTab" class="tab-content active">
-      <div class="card">
-        <div id="reader">
-          <div class="guide"></div>
+      <section class="card">
+        <div id="video-container">
+          <video id="video" autoplay playsinline muted></video>
+          <div class="guide-overlay"></div>
         </div>
         <div class="controls">
-          <button id="btnStart" class="btn-primary">▶ Iniciar Cámara</button>
-          <button id="btnStop" class="btn-stop" disabled>■ Detener</button>
+          <button id="btnStart">▶ Iniciar Cámara</button>
+          <button id="btnStop" disabled>■ Detener</button>
         </div>
-        <div id="status" class="status info">⏳ Presiona "Iniciar Cámara" para comenzar</div>
-      </div>
+        <div class="file-input-wrapper">
+          <label for="fileInput">📷 Subir foto del código (Fallback)</label>
+          <input type="file" id="fileInput" accept="image/*">
+        </div>
+        <div id="status" class="status">⏳ Esperando inicio...</div>
+      </section>
 
-      <div id="resultCard" class="card" style="display:none;">
+      <section class="card" id="resultSection" style="display:none;">
         <div class="result-header">
-          <h2 style="font-size: 1.1rem;">📄 Resultado del Escaneo</h2>
-          <button id="btnNewScan" class="btn-success">🔄 Nueva Lectura</button>
+          <h3>📄 Resultado del Escaneo</h3>
+          <button id="btnNewScan" class="success">🔄 Nueva Lectura</button>
         </div>
         
-        <div id="fieldsContainer"></div>
+        <h4 style="font-size:0.9rem; color:var(--text-muted); margin-bottom:0.5rem;">Información Extraída</h4>
+        <div id="parsedFields" class="field-grid"></div>
         
-        <details style="margin-top: 1rem;">
-          <summary style="cursor: pointer; color: #94a3b8; font-size: 0.85rem;">Ver datos crudos PDF417</summary>
-          <pre id="rawData"></pre>
-          <button id="btnCopy" class="btn-secondary" style="margin-top: 0.5rem; width: 100%;">📋 Copiar Datos Crudos</button>
-        </details>
-      </div>
+        <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+          <details>
+            <summary style="cursor:pointer; color:var(--text-muted); font-size:0.85rem;">Ver datos crudos (PDF417)</summary>
+            <pre id="rawData"></pre>
+            <button id="btnCopy" class="secondary" style="margin-top:0.5rem; width:100%;">📋 Copiar Datos Crudos</button>
+          </details>
+        </div>
+      </section>
     </div>
 
     <div id="recordsTab" class="tab-content">
-      <div class="card">
-        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
-          <button id="btnExport" class="btn-secondary" style="flex: 1;">⬇ Exportar Excel</button>
-          <button id="btnClear" class="btn-danger" style="flex: 1;">🗑 Limpiar Todo</button>
+      <section class="card">
+        <h3>📋 Registros Guardados</h3>
+        <div class="controls" style="margin: 0.75rem 0;">
+          <button id="btnExport" class="secondary">⬇ Exportar CSV</button>
+          <button id="btnClear" class="danger">🗑 Eliminar Todo</button>
         </div>
-        <div id="recordsList"></div>
-        <div id="emptyState" class="empty">📋 No hay registros aún.<br>Escanea una cédula para comenzar.</div>
-      </div>
+        <ul id="recordList" class="record-list"></ul>
+        <p id="emptyState" class="empty-state">No hay registros aún. Escanea una cédula para comenzar.</p>
+      </section>
     </div>
   </div>
 
   <div id="toast" class="toast"></div>
 
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script>
-    let html5QrCode, records = JSON.parse(localStorage.getItem('cedula_records') || '[]');
-    let isScanning = false;
+  <script type="module">
+    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/+esm';
+    import { BarcodeFormat, DecodeHintType } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 
-    const $ = id => document.getElementById(id);
-    const toast = (msg, duration = 2500) => {
-      $('toast').textContent = msg;
-      $('toast').classList.add('show');
-      setTimeout(() => $('toast').classList.remove('show'), duration);
+    let codeReader, scanStream, records = JSON.parse(localStorage.getItem('cedula_records') || '[]');
+    let lastScanTime = 0;
+    const SCAN_COOLDOWN = 1000; // 1 segundo entre escaneos
+
+    const els = {
+      start: document.getElementById('btnStart'),
+      stop: document.getElementById('btnStop'),
+      status: document.getElementById('status'),
+      video: document.getElementById('video'),
+      result: document.getElementById('resultSection'),
+      rawData: document.getElementById('rawData'),
+      parsed: document.getElementById('parsedFields'),
+      newScan: document.getElementById('btnNewScan'),
+      list: document.getElementById('recordList'),
+      totalRecords: document.getElementById('totalRecords'),
+      empty: document.getElementById('emptyState'),
+      clear: document.getElementById('btnClear'),
+      export: document.getElementById('btnExport'),
+      file: document.getElementById('fileInput'),
+      toast: document.getElementById('toast')
     };
 
+    const toast = (msg, type = 'info') => {
+      els.toast.textContent = msg;
+      els.toast.style.borderColor = type === 'error' ? 'var(--error)' : type === 'success' ? 'var(--success)' : 'var(--border)';
+      els.toast.classList.add('show');
+      setTimeout(() => els.toast.classList.remove('show'), 2500);
+    };
+
+    const vibrate = () => navigator.vibrate?.(100);
+
+    // Parser mejorado para cédula colombiana
     const parseCedulaColombiana = (raw) => {
       if (!raw || raw.length < 20) return null;
-      
+
       const fields = {};
-      const clean = raw.replace(/[^\x20-\x7E\u00C0-\u00FF]/g, ' ').replace(/\s+/g, ' ').trim();
       
-      // Número de documento (primeros 7-10 dígitos)
-      const docMatch = clean.match(/^(\d{7,10})/);
+      // Decodificar caracteres especiales
+      let clean = raw;
+      try {
+        // Intentar decodificar como Latin1
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) {
+          bytes[i] = raw.charCodeAt(i);
+        }
+        const decoder = new TextDecoder('latin1');
+        clean = decoder.decode(bytes);
+      } catch(e) {
+        clean = raw.replace(/[^\x20-\x7E\u00C0-\u00FFñÑ]/g, ' ');
+      }
+      
+      clean = clean.replace(/\s+/g, ' ').trim();
+      
+      // Extraer número de documento (7-10 dígitos al inicio o después de @)
+      const docMatch = clean.match(/(?:^|@)(\d{7,10})(?=\D|$)/);
       fields.numeroIdentidad = docMatch ? docMatch[1] : 'N/D';
       
-      // Fechas (DD/MM/YYYY o DD-MM-YYYY)
-      const dates = clean.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}/g) || [];
+      // Extraer fechas (DD/MM/YYYY, DD-MM-YYYY, o similar)
+      const datePattern = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/g;
+      const dates = [];
+      let match;
+      while ((match = datePattern.exec(clean)) !== null) {
+        dates.push(`${match[1].padStart(2,'0')}/${match[2].padStart(2,'0')}/${match[3]}`);
+      }
       fields.fechaNacimiento = dates[0] || 'N/D';
       fields.fechaExpedicion = dates[1] || 'N/D';
       
-      // Sexo
-      const sexoMatch = clean.match(/(?:SEXO|SEX)[\s:]*([MF]|MASCULINO|FEMENINO)/i);
-      fields.sexo = sexoMatch ? 
-        (sexoMatch[1].toUpperCase().includes('M') && !sexoMatch[1].toUpperCase().includes('FEM') ? 'MASCULINO' : 'FEMENINO') : 'N/D';
+      // Extraer sexo
+      const sexoMatch = clean.match(/(?:^|[\s@])(?:SEXO|SEX)[\s:]*([MF]|MASCULINO|FEMENINO)(?:[\s@]|$)/i);
+      if (sexoMatch) {
+        const s = sexoMatch[1].toUpperCase();
+        fields.sexo = s === 'M' || s.includes('MASC') ? 'MASCULINO' : 'FEMENINO';
+      } else {
+        fields.sexo = 'N/D';
+      }
       
-      // Grupo sanguíneo
-      const gsMatch = clean.match(/([AABO][+-])\s*(?:RH|GRUPO)/i) || clean.match(/(?:GS|GRUPO)[\s:]*([AABO][+-])/i);
+      // Extraer grupo sanguíneo y RH
+      const gsMatch = clean.match(/(?:GS|GRUPO)[\s:]*([AABO][+-])/i);
       fields.gsRh = gsMatch ? gsMatch[1].toUpperCase() : 'N/D';
       
-      // Estatura (XXX cm o X.XX m)
+      // Extraer estatura (en cm o metros)
       const alturaMatch = clean.match(/(\d{3})\s*CM/i) || clean.match(/(\d\.\d{2})\s*M/i);
-      fields.estatura = alturaMatch ? (alturaMatch[1] + (alturaMatch[0].includes('CM') ? ' cm' : ' m')) : 'N/D';
+      fields.estatura = alturaMatch ? (alturaMatch[1] + (alturaMatch[0].toUpperCase().includes('CM') ? ' cm' : ' m')) : 'N/D';
       
-      // Nombres y apellidos - buscar patrones comunes
-      const afterDoc = clean.substring(fields.numeroIdentidad.length).trim();
-      const words = afterDoc.split(/\s+/).filter(w => w.length > 2 && !/\d/.test(w) && w.length < 30);
+      // Extraer nombres y apellidos
+      // Buscar después del número de documento
+      const afterDocIndex = clean.indexOf(fields.numeroIdentidad);
+      const afterDoc = afterDocIndex >= 0 ? clean.substring(afterDocIndex + fields.numeroIdentidad.length) : clean;
+      
+      // Dividir en palabras válidas (sin números, longitud razonable)
+      const words = afterDoc.split(/[\s@]+/).filter(w => 
+        w.length > 2 && w.length < 25 && !/\d/.test(w) && 
+        !/^(NAC|EXP|SEX|GS|GRUPO|CM|MASC|FEM)$/i.test(w)
+      );
       
       if (words.length >= 4) {
         fields.nombres = `${words[0]} ${words[1]}`.trim();
@@ -281,9 +264,9 @@
         fields.apellidos = 'N/D';
       }
       
-      // Lugares (después de fechas)
-      const lugarNacMatch = clean.match(/(?:NAC|NACIMIENTO)[\s:]+([A-Z\s]{3,})/i);
-      const lugarExpMatch = clean.match(/(?:EXP|EXPEDICION)[\s:]+([A-Z\s]{3,})/i);
+      // Extraer lugares (después de NAC o EXP)
+      const lugarNacMatch = clean.match(/(?:NAC|NACIMIENTO)[\s:]+([A-ZÁÉÍÓÚÜ\s]{3,})(?=[A-Z]{3,}|$)/i);
+      const lugarExpMatch = clean.match(/(?:EXP|EXPEDICION)[\s:]+([A-ZÁÉÍÓÚÜ\s]{3,})(?=[A-Z]{3,}|$)/i);
       fields.lugarNacimiento = lugarNacMatch ? lugarNacMatch[1].trim() : 'N/D';
       fields.lugarExpedicion = lugarExpMatch ? lugarExpMatch[1].trim() : 'N/D';
       
@@ -304,11 +287,8 @@
         { key: 'lugarExpedicion', label: 'Lugar de Expedición' }
       ];
       
-      $('fieldsContainer').innerHTML = order.map(({key, label}) => 
-        `<div class="field">
-          <div class="field-label">${label}</div>
-          <div class="field-value">${fields[key] || 'N/D'}</div>
-        </div>`
+      els.parsed.innerHTML = order.map(({key, label}) => 
+        `<div class="field-item"><strong>${label}</strong><span>${fields[key] || 'N/D'}</span></div>`
       ).join('');
     };
 
@@ -321,177 +301,217 @@
       };
       records.unshift(record);
       localStorage.setItem('cedula_records', JSON.stringify(records));
-      updateRecords();
+      updateRecordsUI();
       return record;
     };
 
-    const updateRecords = () => {
-      $('recordCount').textContent = records.length;
-      $('emptyState').style.display = records.length ? 'none' : 'block';
+    const updateRecordsUI = () => {
+      els.totalRecords.textContent = records.length;
+      els.empty.style.display = records.length ? 'none' : 'block';
       
-      $('recordsList').innerHTML = records.map(r => `
-        <div class="record" onclick="viewRecord(${r.id})">
-          <div class="record-doc">${r.fields.numeroIdentidad}</div>
-          <div class="record-name">${r.fields.nombres} ${r.fields.apellidos}</div>
-          <div class="record-date">${r.timestamp}</div>
-        </div>
+      els.list.innerHTML = records.map(record => `
+        <li class="record-item" onclick="viewRecord(${record.id})">
+          <div class="record-info">
+            <div class="record-doc">${record.fields.numeroIdentidad || 'N/D'}</div>
+            <div class="record-name">${record.fields.nombres || ''} ${record.fields.apellidos || ''}</div>
+            <div class="record-date">${record.timestamp}</div>
+          </div>
+          <div class="record-actions">
+            <button class="secondary" onclick="event.stopPropagation(); deleteRecord(${record.id})" style="padding:0.4rem;">🗑</button>
+          </div>
+        </li>
       `).join('');
     };
 
     window.viewRecord = (id) => {
       const record = records.find(r => r.id === id);
       if (!record) return;
-      showTab('scanner');
-      $('rawData').textContent = record.raw;
+      
+      switchTab('scanner');
+      els.rawData.textContent = record.raw;
       renderFields(record.fields);
-      $('resultCard').style.display = 'block';
-      $('resultCard').scrollIntoView({ behavior: 'smooth' });
-      toast('Registro cargado');
+      els.result.style.display = 'block';
+      els.result.scrollIntoView({ behavior: 'smooth' });
+      toast('Registro cargado', 'success');
     };
 
-    window.showTab = (tab) => {
+    window.deleteRecord = (id) => {
+      if (!confirm('¿Eliminar este registro?')) return;
+      records = records.filter(r => r.id !== id);
+      localStorage.setItem('cedula_records', JSON.stringify(records));
+      updateRecordsUI();
+      toast('Registro eliminado', 'success');
+    };
+
+    window.switchTab = (tab) => {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       
       if (tab === 'scanner') {
         document.querySelector('.tab:nth-child(1)').classList.add('active');
-        $('scannerTab').classList.add('active');
+        document.getElementById('scannerTab').classList.add('active');
       } else {
         document.querySelector('.tab:nth-child(2)').classList.add('active');
-        $('recordsTab').classList.add('active');
-        updateRecords();
+        document.getElementById('recordsTab').classList.add('active');
+        updateRecordsUI();
       }
     };
 
-    const onScanSuccess = (decodedText) => {
-      if (!decodedText || decodedText.length < 20) return;
+    const processScan = (text) => {
+      const now = Date.now();
+      if (!text || now - lastScanTime < SCAN_COOLDOWN) return;
+      lastScanTime = now;
       
-      const fields = parseCedulaColombiana(decodedText);
+      vibrate();
+      
+      const fields = parseCedulaColombiana(text);
       if (!fields) {
-        toast('⚠️ No se pudo decodificar correctamente', 3000);
+        toast('⚠️ No se pudo decodificar la cédula', 'error');
         return;
       }
       
-      saveRecord(fields, decodedText);
-      $('rawData').textContent = decodedText;
+      saveRecord(fields, text);
+      
+      els.rawData.textContent = text;
       renderFields(fields);
-      $('resultCard').style.display = 'block';
-      $('status').textContent = '✅ Lectura completada';
-      $('status').className = 'status success';
-      toast('🎉 Cédula escaneada correctamente');
+      els.result.style.display = 'block';
+      els.result.scrollIntoView({ behavior: 'smooth' });
+      
+      setStatus('✅ Lectura completada', 'success');
+      toast('🎉 Cédula escaneada correctamente', 'success');
     };
 
-    const onScanFailure = (error) => {
-      // Ignorar errores normales de escaneo
-    };
-
-    $('btnStart').addEventListener('click', async () => {
+    const initCamera = async () => {
       if (!window.location.protocol.startsWith('https') && window.location.hostname !== 'localhost') {
-        $('status').textContent = '⚠️ Requiere HTTPS o localhost';
-        $('status').className = 'status error';
-        return;
+        return setStatus('⚠️ Requiere HTTPS o localhost', 'error');
       }
-
+      
       try {
-        $('status').textContent = '📷 Iniciando cámara...';
-        $('status').className = 'status info';
-        $('btnStart').disabled = true;
+        setStatus('📷 Iniciando...', '');
+        els.start.disabled = true;
+        
+        codeReader = new BrowserMultiFormatReader();
+        const hints = new Map();
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]);
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        codeReader.setHints(hints);
 
-        html5QrCode = new Html5Qrcode("reader");
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          { 
-            fps: 10, 
-            qrbox: { width: 300, height: 140 },
-            aspectRatio: 2.0,
-            disableFlip: false
-          },
-          onScanSuccess,
-          onScanFailure
-        );
+        const videoConstraints = { 
+          facingMode: 'environment', 
+          width: { ideal: 1920 }, 
+          height: { ideal: 1080 }
+        };
+        
+        scanStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+        els.video.srcObject = scanStream;
+        await els.video.play();
 
-        $('btnStop').disabled = false;
-        $('status').textContent = '🔍 Detectando código PDF417...';
-        $('status').className = 'status success';
-        isScanning = true;
+        await codeReader.decodeFromVideoDevice(null, els.video, (result, err) => {
+          if (result?.text) processScan(result.text);
+        });
+
+        els.stop.disabled = false;
+        setStatus('🔍 Detectando PDF417...', 'success');
       } catch (err) {
         console.error(err);
-        $('status').textContent = '⚠️ No se pudo acceder a la cámara. Verifica los permisos del navegador.';
-        $('status').className = 'status error';
-        $('btnStart').disabled = false;
+        setStatus('❌ Error cámara. Verifica permisos.', 'error');
+        els.start.disabled = false;
+      }
+    };
+
+    const stopCamera = async () => {
+      if (scanStream) scanStream.getTracks().forEach(t => t.stop());
+      if (codeReader) codeReader.reset();
+      scanStream = null; 
+      codeReader = null;
+      els.video.srcObject = null;
+      els.start.disabled = false;
+      els.stop.disabled = true;
+      setStatus('⏹ Detenido', '');
+    };
+
+    const setStatus = (msg, type = '') => {
+      els.status.textContent = msg;
+      els.status.className = `status ${type}`;
+    };
+
+    // Nueva lectura
+    els.newScan.addEventListener('click', () => {
+      els.result.style.display = 'none';
+      setStatus('🔍 Listo para siguiente...', '');
+      els.video.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // Fallback Imagen
+    els.file.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      setStatus('📷 Procesando...', '');
+      try {
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const tempReader = new BrowserMultiFormatReader();
+          tempReader.setHints(new Map([[DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]]]));
+          const result = await tempReader.decodeFromImageElement({ src: ev.target.result });
+          if (result?.text) {
+            processScan(result.text);
+            toast('✅ Leído desde imagen', 'success');
+          }
+        };
+        reader.readAsDataURL(file);
+      } catch {
+        toast('❌ No se detectó PDF417', 'error');
+      } finally {
+        e.target.value = '';
+        setStatus('⏹ Listo', '');
       }
     });
 
-    $('btnStop').addEventListener('click', async () => {
-      if (html5QrCode) {
-        await html5QrCode.stop();
-        html5QrCode = null;
-      }
-      $('btnStart').disabled = false;
-      $('btnStop').disabled = true;
-      $('status').textContent = '⏹ Cámara detenida';
-      $('status').className = 'status info';
-      isScanning = false;
+    // Copiar datos
+    document.getElementById('btnCopy').addEventListener('click', () => {
+      navigator.clipboard.writeText(els.rawData.textContent);
+      toast('📋 Datos copiados', 'success');
     });
 
-    $('btnNewScan').addEventListener('click', () => {
-      $('resultCard').style.display = 'none';
-      $('status').textContent = '🔍 Listo para siguiente lectura...';
-      $('status').className = 'status success';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-
-    $('btnCopy').addEventListener('click', () => {
-      navigator.clipboard.writeText($('rawData').textContent);
-      toast('📋 Datos copiados al portapapeles');
-    });
-
-    $('btnClear').addEventListener('click', () => {
-      if (confirm('¿Eliminar todos los registros?')) {
-        records = [];
-        localStorage.setItem('cedula_records', JSON.stringify(records));
-        updateRecords();
-        toast('🗑 Todos los registros eliminados');
-      }
-    });
-
-    $('btnExport').addEventListener('click', () => {
-      if (!records.length) {
-        toast('⚠️ No hay registros para exportar');
-        return;
-      }
+    // Export CSV
+    const exportCSV = () => {
+      if (!records.length) return toast('⚠️ Sin registros', 'error');
       
       const headers = ['Fecha', 'Número', 'Nombres', 'Apellidos', 'Fecha Nac.', 'Lugar Nac.', 'Estatura', 'GS RH', 'Sexo', 'Fecha Exp.', 'Lugar Exp.'];
       const rows = records.map(r => [
-        `"${r.timestamp}"`,
-        `"${r.fields.numeroIdentidad}"`,
-        `"${r.fields.nombres}"`,
-        `"${r.fields.apellidos}"`,
-        `"${r.fields.fechaNacimiento}"`,
-        `"${r.fields.lugarNacimiento}"`,
-        `"${r.fields.estatura}"`,
-        `"${r.fields.gsRh}"`,
-        `"${r.fields.sexo}"`,
-        `"${r.fields.fechaExpedicion}"`,
-        `"${r.fields.lugarExpedicion}"`
+        `"${r.timestamp}"`, `"${r.fields.numeroIdentidad}"`, `"${r.fields.nombres}"`,
+        `"${r.fields.apellidos}"`, `"${r.fields.fechaNacimiento}"`, `"${r.fields.lugarNacimiento}"`,
+        `"${r.fields.estatura}"`, `"${r.fields.gsRh}"`, `"${r.fields.sexo}"`,
+        `"${r.fields.fechaExpedicion}"`, `"${r.fields.lugarExpedicion}"`
       ]);
       
       const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
       const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = URL.createObjectURL(blob);
       a.download = `cedulas_${new Date().toISOString().slice(0,10)}.csv`;
       a.click();
-      URL.revokeObjectURL(url);
-      toast('⬇ Excel descargado');
-    });
+      URL.revokeObjectURL(a.href);
+      toast('⬇ CSV descargado', 'success');
+    };
 
-    window.addEventListener('beforeunload', () => {
-      if (html5QrCode) html5QrCode.stop();
+    // Listeners
+    els.start.addEventListener('click', initCamera);
+    els.stop.addEventListener('click', stopCamera);
+    els.clear.addEventListener('click', () => { 
+      if (confirm('¿Eliminar TODOS los registros?')) { 
+        records = []; 
+        localStorage.setItem('cedula_records', JSON.stringify(records));
+        updateRecordsUI(); 
+        toast('Todos eliminados', 'success');
+      } 
     });
+    els.export.addEventListener('click', exportCSV);
+    window.addEventListener('beforeunload', stopCamera);
 
-    updateRecords();
+    // Init
+    updateRecordsUI();
   </script>
 </body>
 </html>
