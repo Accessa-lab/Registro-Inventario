@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Escáner PDF417 para Cédula de Ciudadanía Colombiana">
+  <meta name="theme-color" content="#0f172a">
+  <title>🔬 Scanner PDF417 · Cédula CO</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --text: #0f172a; --text-muted: #64748b;
+      --primary: #2563eb; --primary-hover: #1d4ed8; --success: #16a34a;
+      --error: #dc2626; --border: #e2e8f0; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      --radius: 12px; --font: system-ui, -apple-system, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a; --surface: #1e293b; --text: #f1f5f9; --text-muted: #94a3b8;
+        --border: #334155; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; padding: 1rem; }
+    .container { max-width: 800px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 1.5rem; }
+    header h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    header p { color: var(--text-muted); font-size: 0.9rem; }
+    
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem; margin-bottom: 1rem; }
+    
+    #reader { width: 100%; height: 300px; background: #000; border-radius: var(--radius); overflow: hidden; position: relative; }
+    .guide-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; height: 120px; border: 2px dashed rgba(255,255,255,0.7); border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.4); }
+    
+    .controls { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    button { padding: 0.6rem 1rem; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; background: var(--primary); color: white; }
+    button:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: var(--border); color: var(--text); }
+    button.secondary:hover:not(:disabled) { background: #cbd5e1; }
+    button.danger { background: var(--error); }
+    
+    .status { margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; }
+    .status.error { color: var(--error); }
+    .status.success { color: var(--success); }
+    
+    #rawData { background: #1e293b; color: #e2e8f0; padding: 0.75rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; overflow-x: auto; margin: 0.5rem 0; white-space: pre-wrap; }
+    .parsed-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; margin: 0.5rem 0; }
+    .parsed-item { background: var(--bg); padding: 0.5rem; border-radius: 6px; font-size: 0.85rem; }
+    .parsed-item strong { display: block; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .record-list { list-style: none; margin: 0.5rem 0; max-height: 300px; overflow-y: auto; }
+    .record-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .record-item:last-child { border-bottom: none; }
+    .record-info { flex: 1; min-width: 0; }
+    .record-doc { font-weight: 500; }
+    .record-date { font-size: 0.75rem; color: var(--text-muted); }
+    .record-actions { display: flex; gap: 0.5rem; }
+    
+    .empty-state { text-align: center; padding: 1.5rem; color: var(--text-muted); font-style: italic; }
+    .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: var(--surface); color: var(--text); padding: 0.75rem 1rem; border-radius: 8px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 1000; border: 1px solid var(--border); }
+    .toast.show { opacity: 1; }
+    
+    @media (max-width: 480px) {
+      #reader { height: 240px; }
+      .controls { flex-direction: column; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🔬 Scanner PDF417 · Cédula CO</h1>
+      <p>Escanea la parte posterior de la cédula colombiana</p>
+    </header>
+
+    <section class="card">
+      <div id="reader"></div>
+      <div class="guide-overlay"></div>
+      <div class="controls">
+        <button id="btnStart">▶ Iniciar Cámara</button>
+        <button id="btnStop" disabled>■ Detener</button>
+      </div>
+      <div id="status" class="status">⏳ Esperando inicio...</div>
+    </section>
+
+    <section class="card" id="resultSection" style="display:none;">
+      <h3>📄 Resultado del Escaneo</h3>
+      <pre id="rawData"></pre>
+      <button id="btnCopy" class="secondary">📋 Copiar Datos Crudos</button>
+      <h4 style="margin-top:1rem; font-size:0.9rem; color:var(--text-muted);">Campos Extraídos</h4>
+      <div id="parsedFields" class="parsed-grid"></div>
+    </section>
+
+    <section class="card">
+      <h3>📋 Registros (<span id="recordCount">0</span>)</h3>
+      <div class="controls" style="margin: 0.5rem 0;">
+        <button id="btnClear" class="secondary">🗑 Limpiar Todo</button>
+        <button id="btnExport" class="secondary">⬇ Exportar CSV</button>
+      </div>
+      <ul id="recordList" class="record-list"></ul>
+      <p id="emptyState" class="empty-state">No hay registros aún. Escanea una cédula para comenzar.</p>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+    // Estado
+    let html5QrCode, records = JSON.parse(localStorage.getItem('cedula_records') || '[]');
+    let isScanning = false, lastScanTime = 0;
+    const SCAN_COOLDOWN = 2000; // ms entre escaneos
+
+    // Elementos
+    const els = {
+      start: document.getElementById('btnStart'),
+      stop: document.getElementById('btnStop'),
+      status: document.getElementById('status'),
+      reader: document.getElementById('reader'),
+      result: document.getElementById('resultSection'),
+      raw: document.getElementById('rawData'),
+      copy: document.getElementById('btnCopy'),
+      parsed: document.getElementById('parsedFields'),
+      list: document.getElementById('recordList'),
+      count: document.getElementById('recordCount'),
+      empty: document.getElementById('emptyState'),
+      clear: document.getElementById('btnClear'),
+      export: document.getElementById('btnExport'),
+      toast: document.getElementById('toast')
+    };
+
+    // Utilidades
+    const toast = (msg, type = 'info') => {
+      els.toast.textContent = msg;
+      els.toast.style.borderColor = type === 'error' ? 'var(--error)' : type === 'success' ? 'var(--success)' : 'var(--border)';
+      els.toast.classList.add('show');
+      setTimeout(() => els.toast.classList.remove('show'), 2500);
+    };
+
+    const vibrate = () => navigator.vibrate?.(100);
+
+    // Parseador inteligente (fallback adaptable)
+    const parseCedula = (raw) => {
+      if (!raw || raw.length < 10) return { raw, fields: {} };
+      
+      const cedulaNum = raw.match(/\b[0-9]{7,10}\b/g)?.[0] || 'N/D';
+      const dates = raw.match(/\d{2}[/\-.]\d{2}[/\-.]\d{4}/g) || [];
+      const words = raw.replace(/[@#*\s_]+/g, ' ').trim().split(/\s+/).filter(w => w.length > 2);
+      
+      const fields = {
+        'Documento': cedulaNum,
+        'Fecha Nac.': dates[0] || 'N/D',
+        'Fecha Exp.': dates[1] || 'N/D',
+        'Nombres': words.slice(0, 2).join(' ') || 'N/D',
+        'Apellidos': words.slice(2, 4).join(' ') || 'N/D',
+        'Sexo': /MASC|HOMBRE/i.test(raw) ? 'Masculino' : /FEM|MUJER/i.test(raw) ? 'Femenino' : 'N/D'
+      };
+
+      return { raw, fields };
+    };
+
+    const renderFields = (fields) => {
+      els.parsed.innerHTML = Object.entries(fields).map(([k, v]) => 
+        `<div class="parsed-item"><strong>${k}</strong>${v}</div>`
+      ).join('');
+    };
+
+    // Gestión de Registros
+    const saveRecords = () => {
+      try {
+        localStorage.setItem('cedula_records', JSON.stringify(records));
+      } catch (e) {
+        toast('Almacenamiento lleno. Exporta y limpia.', 'error');
+      }
+      updateUI();
+    };
+
+    const updateUI = () => {
+      els.count.textContent = records.length;
+      els.empty.style.display = records.length ? 'none' : 'block';
+      
+      // Renderizar invertido (más reciente primero)
+      els.list.innerHTML = records.slice().reverse().map((r, i) => {
+        const actualIdx = records.length - 1 - i;
+        return `
+          <li class="record-item">
+            <div class="record-info">
+              <div class="record-doc">${r.fields.Documento || 'Doc: N/D'}</div>
+              <div class="record-date">${r.timestamp}</div>
+            </div>
+            <div class="record-actions">
+              <button class="secondary" onclick="copyRecord(${actualIdx})" style="padding:0.3rem 0.5rem; font-size:0.8rem;" title="Copiar">📋</button>
+              <button class="danger" onclick="deleteRecord(${actualIdx})" style="padding:0.3rem 0.5rem; font-size:0.8rem;" title="Eliminar">🗑</button>
+            </div>
+          </li>
+        `;
+      }).join('');
+    };
+
+    window.deleteRecord = (idx) => {
+      records.splice(idx, 1);
+      saveRecords();
+      toast('Registro eliminado', 'success');
+    };
+
+    window.copyRecord = (idx) => {
+      navigator.clipboard.writeText(records[idx].raw).then(() => toast('Copiado al portapapeles', 'success'));
+    };
+
+    // Cámara & Escaneo
+    const startCamera = async () => {
+      if (!window.location.protocol.startsWith('https') && window.location.hostname !== 'localhost') {
+        return setStatus('⚠️ Requiere HTTPS o localhost para acceder a la cámara.', 'error');
+      }
+      try {
+        setStatus('📷 Iniciando cámara...', '');
+        els.start.disabled = true;
+        
+        html5QrCode = new Html5Qrcode("reader");
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 300, height: 140 }, aspectRatio: 1.0 },
+          onScanSuccess,
+          onScanFailure
+        );
+        els.stop.disabled = false;
+        setStatus('🔍 Detectando código...', 'success');
+      } catch (err) {
+        console.error(err);
+        setStatus('❌ Error al acceder a la cámara. Verifica permisos.', 'error');
+        els.start.disabled = false;
+      }
+    };
+
+    const stopCamera = async () => {
+      if (html5QrCode) {
+        await html5QrCode.stop().then(() => html5QrCode.clear());
+        html5QrCode = null;
+        setStatus('⏹ Cámara detenida.', '');
+      }
+      els.start.disabled = false;
+      els.stop.disabled = true;
+    };
+
+    const onScanSuccess = (decodedText) => {
+      const now = Date.now();
+      if (now - lastScanTime < SCAN_COOLDOWN || !decodedText) return;
+      lastScanTime = now;
+      
+      vibrate();
+      const parsed = parseCedula(decodedText);
+      const timestamp = new Date().toLocaleString('es-CO');
+      
+      records.push({ raw: decodedText, fields: parsed.fields, timestamp });
+      saveRecords();
+      
+      els.raw.textContent = decodedText;
+      renderFields(parsed.fields);
+      els.result.style.display = 'block';
+      els.result.scrollIntoView({ behavior: 'smooth' });
+      
+      setStatus(`✅ Escaneado correctamente`, 'success');
+      setTimeout(() => setStatus('🔍 Listo para siguiente escaneo...', ''), 2000);
+    };
+
+    const onScanFailure = (err) => {
+      // Ignorar errores de frame vacío o sin código (comportamiento normal)
+      if (!err.includes('No MultiFormat Readers') && !err.includes('QR Code not found')) {
+        console.warn('Scan warning:', err);
+      }
+    };
+
+    const setStatus = (msg, type) => {
+      els.status.textContent = msg;
+      els.status.className = `status ${type}`;
+    };
+
+    // Exportar CSV
+    const exportCSV = () => {
+      if (!records.length) return toast('No hay registros para exportar', 'error');
+      const headers = ['Fecha', 'Documento', 'Nombres', 'Apellidos', 'Fecha Nac.', 'Fecha Exp.', 'Sexo', 'Raw PDF417'];
+      const rows = records.map(r => [
+        `"${r.timestamp}"`, `"${r.fields.Documento || ''}"`, `"${r.fields.Nombres || ''}"`,
+        `"${r.fields.Apellidos || ''}"`, `"${r.fields['Fecha Nac.'] || ''}"`, `"${r.fields['Fecha Exp.'] || ''}"`,
+        `"${r.fields.Sexo || ''}"`, `"${r.raw.replace(/"/g, '""')}"`
+      ]);
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `cedulas_co_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click(); URL.revokeObjectURL(url);
+      toast('CSV descargado', 'success');
+    };
+
+    // Event Listeners
+    els.start.addEventListener('click', startCamera);
+    els.stop.addEventListener('click', stopCamera);
+    els.copy.addEventListener('click', () => {
+      navigator.clipboard.writeText(els.raw.textContent).then(() => toast('Datos copiados', 'success'));
+    });
+    els.clear.addEventListener('click', () => {
+      if (confirm('¿Eliminar todos los registros? Esta acción no se puede deshacer.')) {
+        records = []; saveRecords(); toast('Registros eliminados', 'success');
+      }
+    });
+    els.export.addEventListener('click', exportCSV);
+
+    // Inicialización
+    updateUI();
+    window.addEventListener('beforeunload', () => html5QrCode?.stop());
+  </script>
+</body>
+</html>
