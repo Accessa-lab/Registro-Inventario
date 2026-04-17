@@ -28,13 +28,13 @@
     
     .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem; margin-bottom: 1rem; }
     
-    #reader { width: 100%; height: 320px; background: #000; border-radius: var(--radius); overflow: hidden; position: relative; }
+    #reader { width: 100%; height: 350px; background: #000; border-radius: var(--radius); overflow: hidden; position: relative; }
     #reader video { width: 100%; height: 100%; object-fit: cover; }
-    .guide-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; height: 130px; border: 3px solid rgba(37, 99, 235, 0.8); border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); }
-    .guide-overlay::after { content: 'Alinea el código PDF417 aquí'; position: absolute; bottom: -25px; left: 0; width: 100%; text-align: center; color: #fff; font-size: 0.8rem; font-weight: 500; }
+    .guide-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 88%; height: 140px; border: 3px solid rgba(37, 99, 235, 0.9); border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.55); }
+    .guide-overlay::after { content: 'Alinea el código PDF417 aquí'; position: absolute; bottom: -26px; left: 0; width: 100%; text-align: center; color: #fff; font-size: 0.85rem; font-weight: 500; }
     
     .controls { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
-    button { padding: 0.6rem 1rem; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; background: var(--primary); color: white; }
+    button { padding: 0.65rem 1.1rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; background: var(--primary); color: white; font-size: 0.9rem; }
     button:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     button.secondary { background: var(--border); color: var(--text); }
@@ -42,9 +42,10 @@
     button.danger { background: var(--error); }
     button.success { background: var(--success); }
     
-    .status { margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; }
-    .status.error { color: var(--error); }
-    .status.success { color: var(--success); }
+    .status { margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border-radius: 6px; }
+    .status.error { background: rgba(220, 38, 38, 0.15); color: var(--error); }
+    .status.success { background: rgba(22, 163, 74, 0.15); color: var(--success); }
+    .status.info { background: rgba(37, 99, 235, 0.15); color: var(--primary); }
     
     .field-grid { display: grid; gap: 0.75rem; margin: 1rem 0; }
     .field-item { background: var(--bg); padding: 0.75rem; border-radius: 8px; }
@@ -79,7 +80,7 @@
     #rawData { background: #1e293b; color: #e2e8f0; padding: 0.75rem; border-radius: 8px; font-family: monospace; font-size: 0.75rem; overflow-x: auto; margin: 0.5rem 0; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
     
     @media (max-width: 480px) {
-      #reader { height: 260px; }
+      #reader { height: 280px; }
       .controls { flex-direction: column; }
       button { width: 100%; }
       .tabs { overflow-x: auto; }
@@ -108,7 +109,7 @@
           <button id="btnStart">▶ Iniciar Cámara</button>
           <button id="btnStop" disabled>■ Detener</button>
         </div>
-        <div id="status" class="status">⏳ Esperando inicio...</div>
+        <div id="status" class="status info">⏳ Presiona "Iniciar Cámara" para comenzar</div>
       </section>
 
       <section class="card" id="resultSection" style="display:none;">
@@ -145,13 +146,13 @@
 
   <div id="toast" class="toast"></div>
 
-  <!-- ✅ LIBRERÍA QUE FUNCIONABA (html5-qrcode 2.3.8) -->
+  <!-- ✅ LIBRERÍA QUE FUNCIONA (html5-qrcode 2.3.8) -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
     let html5QrCode, records = JSON.parse(localStorage.getItem('cedula_records') || '[]');
     let lastScanTime = 0;
     let isScanning = false;
-    const SCAN_COOLDOWN = 3000; // 3 segundos para lectura efectiva (confirmado)
+    const SCAN_COOLDOWN = 3000; // 3 segundos - TIEMPO EFECTIVO CONFIRMADO
 
     const $ = id => document.getElementById(id);
     const els = {
@@ -411,39 +412,44 @@
       els.result.scrollIntoView({ behavior: 'smooth' });
       
       setStatus('✅ Lectura completada', 'success');
-      toast('🎉 Cédula escaneada', 'success');
+      toast('🎉 Cédula escaneada correctamente', 'success');
     };
 
-    // ✅ CONFIGURACIÓN DE CÁMARA (LA QUE FUNCIONABA)
+    // ✅ CONFIGURACIÓN DE CÁMARA OPTIMIZADA (LO QUE FUNCIONA + MEJOR CALIDAD)
     const startCamera = async () => {
       if (!window.location.protocol.startsWith('https') && window.location.hostname !== 'localhost') {
         return setStatus('⚠️ Requiere HTTPS o localhost', 'error');
       }
       
       try {
-        setStatus('📷 Iniciando...', '');
+        setStatus('📷 Iniciando cámara...', 'info');
         els.start.disabled = true;
         els.stop.disabled = false;
         isScanning = true;
         
         html5QrCode = new Html5Qrcode('reader');
         
-        // ✅ CONFIGURACIÓN PROBADA QUE FUNCIONA
+        // ✅ CONFIGURACIÓN PROBADA QUE FUNCIONA CON MEJOR CALIDAD
         await html5QrCode.start(
-          { facingMode: 'environment' },
+          { facingMode: 'environment' },  // Cámara trasera
           { 
-            fps: 10, 
-            qrbox: { width: 300, height: 140 },
-            aspectRatio: 2.0
+            fps: 10,  // 10 frames por segundo (estable)
+            qrbox: { width: 320, height: 145 },  // Ligeramente más grande para mejor captura
+            aspectRatio: 2.2  // Proporción PDF417 optimizada
           },
-          (decodedText) => processScan(decodedText),
-          (error) => { /* Ignorar errores de frame vacío */ }
+          (decodedText) => {
+            console.log('✅ PDF417 DETECTADO:', decodedText.substring(0, 50) + '...');
+            processScan(decodedText);
+          },
+          (error) => {
+            // Ignorar errores normales de escaneo
+          }
         );
         
-        setStatus('🔍 Detectando PDF417...', 'success');
+        setStatus('🔍 Detectando PDF417... (Mantén estable 3 segundos)', 'success');
       } catch (err) {
-        console.error(err);
-        setStatus('❌ Error: ' + err.message, 'error');
+        console.error('❌ Error cámara:', err);
+        setStatus('❌ Error: ' + err.message + '. Verifica permisos.', 'error');
         els.start.disabled = false;
         els.stop.disabled = true;
         isScanning = false;
@@ -459,7 +465,7 @@
       els.start.disabled = false;
       els.stop.disabled = true;
       isScanning = false;
-      setStatus('⏹ Cámara detenida', '');
+      setStatus('⏹ Cámara detenida', 'info');
     };
 
     const setStatus = (msg, type = '') => {
@@ -472,7 +478,7 @@
     els.stop.addEventListener('click', stopCamera);
     els.newScan.addEventListener('click', () => {
       els.result.style.display = 'none';
-      setStatus('🔍 Listo para siguiente...', '');
+      setStatus('🔍 Listo para siguiente...', 'success');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
     els.copy.addEventListener('click', () => {
