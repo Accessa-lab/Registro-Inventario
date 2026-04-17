@@ -3,175 +3,576 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Escáner Ágil de Documentos</title>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <meta name="description" content="Escáner PDF417 optimizado para Cédula de Ciudadanía Colombiana">
+  <meta name="theme-color" content="#0f172a">
+  <title>🔬 Scanner PDF417 · Cédula CO</title>
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 1.5rem 1rem; background: #f1f5f9; color: #1e293b; }
-    h2 { text-align: center; margin-bottom: 0.5rem; }
-    #reader { width: 100%; max-width: 380px; margin: 0 auto 1rem; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-    .controls { display: flex; gap: 10px; margin-bottom: 1.5rem; justify-content: center; }
-    button { padding: 10px 16px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.95rem; }
-    #btn-start { background: #2563eb; color: white; }
-    #btn-start:disabled { background: #94a3b8; cursor: not-allowed; }
-    #btn-stop { background: #dc2626; color: white; }
-    #btn-stop:disabled { background: #94a3b8; cursor: not-allowed; }
-    .status { text-align: center; font-size: 0.85rem; color: #64748b; margin-bottom: 0.5rem; min-height: 1.2em; }
-    form { display: grid; gap: 12px; background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; width: 100%; }
-    input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
-    #alerta-duplicado { display: none; background: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 10px; margin-top: 1rem; animation: fadeIn 0.3s ease; }
-    #alerta-duplicado strong { color: #b45309; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --text: #0f172a; --text-muted: #64748b;
+      --primary: #2563eb; --primary-hover: #1d4ed8; --success: #16a34a;
+      --error: #dc2626; --border: #e2e8f0; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      --radius: 12px; --font: system-ui, -apple-system, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a; --surface: #1e293b; --text: #f1f5f9; --text-muted: #94a3b8;
+        --border: #334155; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; padding: 1rem; }
+    .container { max-width: 800px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 1.5rem; }
+    header h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    header p { color: var(--text-muted); font-size: 0.9rem; }
+    
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem; margin-bottom: 1rem; }
+    
+    #video-container { position: relative; width: 100%; height: 320px; background: #000; border-radius: var(--radius); overflow: hidden; }
+    #video-container video { width: 100%; height: 100%; object-fit: cover; }
+    .guide-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; height: 130px; border: 3px solid rgba(37, 99, 235, 0.8); border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); }
+    .guide-overlay::after { content: 'Alinea el código PDF417 aquí'; position: absolute; bottom: -25px; left: 0; width: 100%; text-align: center; color: #fff; font-size: 0.8rem; font-weight: 500; }
+    
+    .controls { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    button { padding: 0.6rem 1rem; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; background: var(--primary); color: white; }
+    button:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: var(--border); color: var(--text); }
+    button.secondary:hover:not(:disabled) { background: #cbd5e1; }
+    button.danger { background: var(--error); }
+    button.success { background: var(--success); }
+    
+    .status { margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; }
+    .status.error { color: var(--error); }
+    .status.success { color: var(--success); }
+    
+    .field-grid { display: grid; gap: 0.75rem; margin: 1rem 0; }
+    .field-item { background: var(--bg); padding: 0.75rem; border-radius: 8px; }
+    .field-item strong { display: block; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem; }
+    .field-item span { font-size: 1rem; font-weight: 500; word-break: break-word; }
+    
+    .record-list { list-style: none; margin: 0.5rem 0; max-height: 400px; overflow-y: auto; }
+    .record-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; cursor: pointer; transition: background 0.2s; }
+    .record-item:hover { background: var(--bg); }
+    .record-item:last-child { border-bottom: none; }
+    .record-info { flex: 1; min-width: 0; }
+    .record-doc { font-weight: 600; font-size: 1rem; }
+    .record-name { font-size: 0.85rem; color: var(--text-muted); }
+    .record-date { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .record-actions { display: flex; gap: 0.5rem; }
+    
+    .empty-state { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
+    .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: var(--surface); color: var(--text); padding: 0.75rem 1rem; border-radius: 8px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 1000; border: 1px solid var(--border); }
+    .toast.show { opacity: 1; }
+    
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid var(--border); }
+    .tab { padding: 0.75rem 1.5rem; background: none; border: none; color: var(--text-muted); cursor: pointer; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    
+    .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .result-header h3 { font-size: 1.1rem; }
+    
+    #rawData { background: #1e293b; color: #e2e8f0; padding: 0.75rem; border-radius: 8px; font-family: monospace; font-size: 0.75rem; overflow-x: auto; margin: 0.5rem 0; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+    
+    @media (max-width: 480px) {
+      #video-container { height: 260px; }
+      .controls { flex-direction: column; }
+      button { width: 100%; }
+      .tabs { overflow-x: auto; }
+      .tab { white-space: nowrap; }
+    }
   </style>
 </head>
 <body>
+  <div class="container">
+    <header>
+      <h1>🔬 Scanner PDF417 · Cédula CO</h1>
+      <p>Escanea la parte posterior de la cédula colombiana</p>
+    </header>
 
-  <h2>📄 Registro de Documentos</h2>
-  <div class="status" id="status-text">Presiona "Iniciar Cámara" para escanear</div>
-  <div id="reader"></div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('scanner')">📷 Escáner</button>
+      <button class="tab" onclick="switchTab('records')">📋 Registros (<span id="totalRecords">0</span>)</button>
+    </div>
 
-  <div class="controls">
-    <button id="btn-start">📷 Iniciar Cámara</button>
-    <button id="btn-stop" disabled>⏹ Detener Lectura</button>
+    <div id="scannerTab" class="tab-content active">
+      <section class="card">
+        <div id="video-container">
+          <video id="video" autoplay playsinline muted></video>
+          <div class="guide-overlay"></div>
+        </div>
+        <div class="controls">
+          <button id="btnStart">▶ Iniciar Cámara</button>
+          <button id="btnStop" disabled>■ Detener</button>
+        </div>
+        <div id="status" class="status">⏳ Esperando inicio...</div>
+      </section>
+
+      <section class="card" id="resultSection" style="display:none;">
+        <div class="result-header">
+          <h3>📄 Resultado del Escaneo</h3>
+          <button id="btnNewScan" class="success">🔄 Nueva Lectura</button>
+        </div>
+        
+        <h4 style="font-size:0.9rem; color:var(--text-muted); margin-bottom:0.5rem;">Información Extraída</h4>
+        <div id="parsedFields" class="field-grid"></div>
+        
+        <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+          <details>
+            <summary style="cursor:pointer; color:var(--text-muted); font-size:0.85rem;">Ver datos crudos (PDF417)</summary>
+            <pre id="rawData"></pre>
+            <button id="btnCopy" class="secondary" style="margin-top:0.5rem; width:100%;">📋 Copiar Datos Crudos</button>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <div id="recordsTab" class="tab-content">
+      <section class="card">
+        <h3>📋 Registros Guardados</h3>
+        <div class="controls" style="margin: 0.75rem 0;">
+          <button id="btnExport" class="secondary">⬇ Exportar CSV</button>
+          <button id="btnClear" class="danger">🗑 Eliminar Todo</button>
+        </div>
+        <ul id="recordList" class="record-list"></ul>
+        <p id="emptyState" class="empty-state">No hay registros aún. Escanea una cédula para comenzar.</p>
+      </section>
+    </div>
   </div>
 
-  <form id="data-form">
-    <input type="text" id="campo-id" placeholder="ID / Clave única" readonly>
-    <input type="text" id="campo-nombre" placeholder="Nombre completo">
-    <input type="text" id="campo-doc" placeholder="Tipo de documento">
-    <input type="text" id="campo-expedicion" placeholder="Fecha de expedición">
-    <input type="text" id="campo-vigencia" placeholder="Fecha de vigencia">
-  </form>
+  <div id="toast" class="toast"></div>
 
-  <div id="alerta-duplicado"></div>
+  <script type="module">
+    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/+esm';
+    import { BarcodeFormat, DecodeHintType } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 
-  <script>
-    let scanner = null;
+    let codeReader, scanStream, records = JSON.parse(localStorage.getItem('cedula_records') || '[]');
+    let lastScanTime = 0;
     let isScanning = false;
+    const SCAN_COOLDOWN = 500; // Reducido a 500ms para escaneo más rápido
 
-    // ⚙️ CONFIGURACIÓN OPTIMIZADA PARA LECTURA < 1s
-    const scanConfig = {
-      fps: 12,                  // Más cuadros por segundo = detección rápida
-      qrbox: { width: 280, height: 280 },
-      disableFlip: true,        // Evita procesamiento espejo
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.PDF_417,
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.CODE_128
-      ]
+    const els = {
+      start: document.getElementById('btnStart'),
+      stop: document.getElementById('btnStop'),
+      status: document.getElementById('status'),
+      video: document.getElementById('video'),
+      result: document.getElementById('resultSection'),
+      rawData: document.getElementById('rawData'),
+      parsed: document.getElementById('parsedFields'),
+      newScan: document.getElementById('btnNewScan'),
+      list: document.getElementById('recordList'),
+      totalRecords: document.getElementById('totalRecords'),
+      empty: document.getElementById('emptyState'),
+      clear: document.getElementById('btnClear'),
+      export: document.getElementById('btnExport'),
+      toast: document.getElementById('toast')
     };
 
-    document.getElementById("btn-start").addEventListener("click", iniciarCamara);
-    document.getElementById("btn-stop").addEventListener("click", detenerLectura);
+    const toast = (msg, type = 'info') => {
+      els.toast.textContent = msg;
+      els.toast.style.borderColor = type === 'error' ? 'var(--error)' : type === 'success' ? 'var(--success)' : 'var(--border)';
+      els.toast.classList.add('show');
+      setTimeout(() => els.toast.classList.remove('show'), 3000);
+    };
 
-    function iniciarCamara() {
-      if (isScanning) return;
-      scanner = new Html5Qrcode("reader");
-      scanner.start(
-        { facingMode: "environment" },
-        scanConfig,
-        onDecodeSuccess,
-        onDecodeFailure
-      ).then(() => {
-        isScanning = true;
-        actualizarEstado("🔍 Escaneando... Apunta al código");
-        document.getElementById("btn-start").disabled = true;
-        document.getElementById("btn-stop").disabled = false;
-      }).catch(err => {
-        console.error("Error al iniciar cámara:", err);
-        alert("❌ No se pudo acceder a la cámara. Verifica permisos y usa HTTPS o localhost.");
-      });
-    }
+    const vibrate = () => navigator.vibrate?.(100);
 
-    function detenerLectura() {
-      if (!isScanning || !scanner) return;
-      scanner.stop().then(() => {
-        isScanning = false;
-        actualizarEstado("⏸ Cámara detenida");
-        document.getElementById("btn-start").disabled = false;
-        document.getElementById("btn-stop").disabled = true;
-      }).catch(err => console.error("Error al detener:", err));
-    }
+    // Parser optimizado para cédula colombiana PDF417
+    const parseCedulaColombiana = (raw) => {
+      if (!raw || raw.length < 20) return null;
 
-    function actualizarEstado(texto) {
-      document.getElementById("status-text").textContent = texto;
-    }
-
-    function onDecodeSuccess(decodedText) {
-      // 🚀 DETENER INMEDIATAMENTE PARA MÁXIMA AGILIDAD
-      detenerLectura();
-      console.log("📦 Datos crudos recibidos:", decodedText); // Útil para adaptar el parser
-
-      // 1️⃣ DECODIFICAR Y MAPEAR
-      const datos = parsearDocumento(decodedText);
-      if (!datos) {
-        alert("⚠️ Formato no reconocido o código dañado. Revisa la consola (F12) para ver los datos crudos.");
-        return;
-      }
-
-      // 2️⃣ VERIFICAR DUPLICADOS
-      const clave = datos.id.trim();
-      if (!clave) {
-        alert("⚠️ No se encontró un ID válido en el documento.");
-        return;
-      }
-
-      const registrado = localStorage.getItem(`doc_${clave}`);
-      if (registrado) {
-        mostrarDuplicado(JSON.parse(registrado));
-      } else {
-        localStorage.setItem(`doc_${clave}`, JSON.stringify(datos));
-        mostrarFormulario(datos);
-        actualizarEstado("✅ Documento registrado correctamente");
-      }
-    }
-
-    function onDecodeFailure(error) {
-      // Ignorar ruido normal de escaneo
-      if (!error.toString().includes("not found") && !error.toString().includes("No MultiFormat Readers")) {
-        console.warn("⚠️ Error de escaneo:", error);
-      }
-    }
-
-    // 🔍 FUNCIÓN DE PARSEO (ADAPTA AQUÍ SEGÚN TU DOCUMENTO)
-    function parsearDocumento(raw) {
-      // Ejemplo básico: datos separados por "@"
-      // Cambia esta lógica según el formato real de tus códigos
-      const partes = raw.split("@"); 
-      if (partes.length < 5) return null;
-
-      return {
-        id: partes[0]?.trim() || "",
-        nombre: partes[1]?.trim() || "",
-        doc: partes[2]?.trim() || "",
-        expedicion: partes[3]?.trim() || "",
-        vigencia: partes[4]?.trim() || ""
+      const fields = {
+        numeroIdentidad: 'N/D',
+        nombres: 'N/D',
+        apellidos: 'N/D',
+        fechaNacimiento: 'N/D',
+        lugarNacimiento: 'N/D',
+        estatura: 'N/D',
+        gsRh: 'N/D',
+        sexo: 'N/D',
+        fechaExpedicion: 'N/D',
+        lugarExpedicion: 'N/D'
       };
-    }
+      
+      try {
+        // Decodificar de Latin1 a UTF-8
+        let decoded = '';
+        for (let i = 0; i < raw.length; i++) {
+          const charCode = raw.charCodeAt(i);
+          if (charCode >= 0x80 && charCode <= 0xFF) {
+            // Caracteres extendidos Latin1
+            const latin1Map = {
+              0xC1: 'Á', 0xC9: 'É', 0xCD: 'Í', 0xD3: 'Ó', 0xDA: 'Ú',
+              0xE1: 'á', 0xE9: 'é', 0xED: 'í', 0xF3: 'ó', 0xFA: 'ú',
+              0xD1: 'Ñ', 0xF1: 'ñ'
+            };
+            decoded += latin1Map[charCode] || String.fromCharCode(charCode);
+          } else {
+            decoded += raw[i];
+          }
+        }
+        
+        // Limpiar caracteres no imprimibles
+        decoded = decoded.replace(/[\x00-\x1F\x7F]/g, ' ');
+        decoded = decoded.replace(/\s+/g, ' ').trim();
+        
+        // Extraer número de documento (7-10 dígitos consecutivos)
+        const docMatch = decoded.match(/\b(\d{7,10})\b/);
+        if (docMatch) {
+          fields.numeroIdentidad = docMatch[1];
+        }
+        
+        // Extraer fechas (DD/MM/YYYY o DD-MM-YYYY)
+        const datePattern = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/g;
+        const dates = [];
+        let match;
+        while ((match = datePattern.exec(decoded)) !== null) {
+          dates.push(`${match[1].padStart(2,'0')}/${match[2].padStart(2,'0')}/${match[3]}`);
+        }
+        if (dates.length >= 1) fields.fechaNacimiento = dates[0];
+        if (dates.length >= 2) fields.fechaExpedicion = dates[1];
+        
+        // Extraer sexo
+        if (/MASCULINO|MASC|M(?=\s|$)/i.test(decoded) && !/FEM/i.test(decoded)) {
+          fields.sexo = 'MASCULINO';
+        } else if (/FEMENINO|FEM|F(?=\s|$)/i.test(decoded)) {
+          fields.sexo = 'FEMENINO';
+        }
+        
+        // Extraer grupo sanguíneo (A+, A-, B+, B-, AB+, AB-, O+, O-)
+        const bloodMatch = decoded.match(/\b([ABO][AB]?)\s*([+-])\b/i);
+        if (bloodMatch) {
+          fields.gsRh = `${bloodMatch[1].toUpperCase()}${bloodMatch[2]}`;
+        }
+        
+        // Extraer estatura (3 dígitos seguidos de CM o metros)
+        const heightMatch = decoded.match(/\b(1\d{2})\s*CM\b/i) || decoded.match(/\b(\d\.\d{2})\s*M\b/i);
+        if (heightMatch) {
+          fields.estatura = heightMatch[1] + (heightMatch[0].toUpperCase().includes('CM') ? ' cm' : ' m');
+        } else {
+          // Buscar solo número de 3 dígitos entre 100-200
+          const heightNum = decoded.match(/\b(1\d{2})\b/);
+          if (heightNum && heightNum[1] >= 100 && heightNum[1] <= 200) {
+            fields.estatura = `${heightNum[1]} cm`;
+          }
+        }
+        
+        // Extraer nombres y apellidos
+        // Eliminar del texto lo que ya extrajimos
+        let textForNames = decoded;
+        textForNames = textForNames.replace(fields.numeroIdentidad, ' ');
+        textForNames = textForNames.replace(datePattern, ' ');
+        textForNames = textForNames.replace(/\b(1\d{2})\s*CM\b/i, ' ');
+        textForNames = textForNames.replace(/\b([ABO][AB]?)\s*([+-])\b/i, ' ');
+        textForNames = textForNames.replace(/(?:MASCULINO|FEMENINO|MASC|FEM)/gi, ' ');
+        textForNames = textForNames.replace(/\s+/g, ' ').trim();
+        
+        // Dividir en palabras (evitar números y palabras muy cortas/largas)
+        const words = textForNames.split(' ').filter(w => 
+          w.length > 2 && w.length < 25 && !/\d/.test(w) &&
+          !/^(NAC|EXP|SEX|GS|GRUPO|CM|RH)$/i.test(w)
+        );
+        
+        // Asumir formato: NOMBRE1 NOMBRE2 APELLIDO1 APELLIDO2
+        if (words.length >= 4) {
+          fields.nombres = `${words[0]} ${words[1]}`.trim();
+          fields.apellidos = `${words[2]} ${words[3]}`.trim();
+        } else if (words.length === 3) {
+          fields.nombres = words[0];
+          fields.apellidos = `${words[1]} ${words[2]}`.trim();
+        } else if (words.length === 2) {
+          fields.nombres = words[0];
+          fields.apellidos = words[1];
+        } else if (words.length === 1) {
+          fields.nombres = words[0];
+        }
+        
+        // Extraer lugares de expedición (ciudades comunes)
+        const ciudades = [
+          'BOGOTA|BOGOTÁ|SANTA FE DE BOGOTA', 'MEDELLIN|MEDELLÍN', 'CALI',
+          'BARRANQUILLA', 'CARTAGENA', 'BUCARAMANGA', 'PEREIRA', 'MANIZALES',
+          'IBAGUE|IBAGUÉ', 'CUCUTA|CÚCUTA', 'PASTO', 'VILLAVICENCIO',
+          'MONTERIA|MONTERÍA', 'VALLEDUPAR', 'SINCELEJO', 'POPAYAN|POPAYÁN',
+          'TUNJA', 'FLORENCIA', 'YOPAL', 'MOCOA', 'LETICIA', 'SAN ANDRES|SAN ANDRÉS'
+        ];
+        
+        for (const ciudad of ciudades) {
+          const ciudadMatch = decoded.match(new RegExp(`(${ciudad})`, 'i'));
+          if (ciudadMatch) {
+            fields.lugarExpedicion = ciudadMatch[1].toUpperCase();
+            break;
+          }
+        }
+        
+        return fields;
+      } catch (e) {
+        console.error('Error parsing:', e);
+        return null;
+      }
+    };
 
-    function mostrarFormulario(datos) {
-      document.getElementById("campo-id").value = datos.id;
-      document.getElementById("campo-nombre").value = datos.nombre;
-      document.getElementById("campo-doc").value = datos.doc;
-      document.getElementById("campo-expedicion").value = datos.expedicion;
-      document.getElementById("campo-vigencia").value = datos.vigencia;
-    }
+    const renderFields = (fields) => {
+      const order = [
+        { key: 'nombres', label: 'Nombres' },
+        { key: 'apellidos', label: 'Apellidos' },
+        { key: 'numeroIdentidad', label: 'Número de Identidad' },
+        { key: 'fechaNacimiento', label: 'Fecha de Nacimiento' },
+        { key: 'lugarNacimiento', label: 'Lugar de Nacimiento' },
+        { key: 'estatura', label: 'Estatura' },
+        { key: 'gsRh', label: 'GS RH' },
+        { key: 'sexo', label: 'Sexo' },
+        { key: 'fechaExpedicion', label: 'Fecha de Expedición' },
+        { key: 'lugarExpedicion', label: 'Lugar de Expedición' }
+      ];
+      
+      els.parsed.innerHTML = order.map(({key, label}) => 
+        `<div class="field-item"><strong>${label}</strong><span>${fields[key] || 'N/D'}</span></div>`
+      ).join('');
+    };
 
-    function mostrarDuplicado(datos) {
-      const alerta = document.getElementById("alerta-duplicado");
-      alerta.style.display = "block";
-      alerta.innerHTML = `
-        <strong>⚠️ Documento ya registrado anteriormente</strong><br><br>
-        ID: ${datos.id}<br>
-        Nombre: ${datos.nombre}<br>
-        Documento: ${datos.doc}<br>
-        Expedición: ${datos.expedicion}<br>
-        Vigencia: ${datos.vigencia}<br><br>
-        <button onclick="this.parentElement.style.display='none'" style="background:#f59e0b;color:white;padding:6px 12px;border:none;border-radius:6px;cursor:pointer;">Cerrar aviso</button>
-      `;
-      mostrarFormulario(datos);
-    }
+    // Verificar si ya existe el registro
+    const findExistingRecord = (numeroIdentidad) => {
+      return records.find(r => r.fields.numeroIdentidad === numeroIdentidad);
+    };
+
+    const saveRecord = (fields, raw) => {
+      // Verificar duplicado
+      const existing = findExistingRecord(fields.numeroIdentidad);
+      if (existing) {
+        return existing;
+      }
+      
+      const record = {
+        id: Date.now(),
+        fields,
+        raw,
+        timestamp: new Date().toLocaleString('es-CO')
+      };
+      records.unshift(record);
+      localStorage.setItem('cedula_records', JSON.stringify(records));
+      updateRecordsUI();
+      return record;
+    };
+
+    const updateRecordsUI = () => {
+      els.totalRecords.textContent = records.length;
+      els.empty.style.display = records.length ? 'none' : 'block';
+      
+      els.list.innerHTML = records.map(record => `
+        <li class="record-item" onclick="viewRecord(${record.id})">
+          <div class="record-info">
+            <div class="record-doc">${record.fields.numeroIdentidad || 'N/D'}</div>
+            <div class="record-name">${record.fields.nombres || ''} ${record.fields.apellidos || ''}</div>
+            <div class="record-date">${record.timestamp}</div>
+          </div>
+          <div class="record-actions">
+            <button class="secondary" onclick="event.stopPropagation(); deleteRecord(${record.id})" style="padding:0.4rem;">🗑</button>
+          </div>
+        </li>
+      `).join('');
+    };
+
+    window.viewRecord = (id) => {
+      const record = records.find(r => r.id === id);
+      if (!record) return;
+      
+      switchTab('scanner');
+      els.rawData.textContent = record.raw;
+      renderFields(record.fields);
+      els.result.style.display = 'block';
+      els.result.scrollIntoView({ behavior: 'smooth' });
+      toast('✅ Registro cargado', 'success');
+    };
+
+    window.deleteRecord = (id) => {
+      if (!confirm('¿Eliminar este registro?')) return;
+      records = records.filter(r => r.id !== id);
+      localStorage.setItem('cedula_records', JSON.stringify(records));
+      updateRecordsUI();
+      toast('Registro eliminado', 'success');
+    };
+
+    window.switchTab = (tab) => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      
+      if (tab === 'scanner') {
+        document.querySelector('.tab:nth-child(1)').classList.add('active');
+        document.getElementById('scannerTab').classList.add('active');
+      } else {
+        document.querySelector('.tab:nth-child(2)').classList.add('active');
+        document.getElementById('recordsTab').classList.add('active');
+        updateRecordsUI();
+      }
+    };
+
+    const processScan = (text) => {
+      const now = Date.now();
+      if (!text || now - lastScanTime < SCAN_COOLDOWN) return;
+      lastScanTime = now;
+      
+      vibrate();
+      
+      const fields = parseCedulaColombiana(text);
+      if (!fields || fields.numeroIdentidad === 'N/D') {
+        toast('⚠️ No se pudo decodificar correctamente', 'error');
+        return;
+      }
+      
+      // Verificar si ya existe
+      const existing = findExistingRecord(fields.numeroIdentidad);
+      if (existing) {
+        toast(`📋 Cédula ${fields.numeroIdentidad} ya registrada`, 'error');
+        setTimeout(() => viewRecord(existing.id), 1500);
+        return;
+      }
+      
+      saveRecord(fields, text);
+      
+      els.rawData.textContent = text;
+      renderFields(fields);
+      els.result.style.display = 'block';
+      els.result.scrollIntoView({ behavior: 'smooth' });
+      
+      setStatus('✅ Lectura completada', 'success');
+      toast('🎉 Cédula escaneada correctamente', 'success');
+    };
+
+    const initCamera = async () => {
+      if (!window.location.protocol.startsWith('https') && window.location.hostname !== 'localhost') {
+        return setStatus('⚠️ Requiere HTTPS o localhost', 'error');
+      }
+      
+      try {
+        setStatus('📷 Iniciando...', '');
+        els.start.disabled = true;
+        els.stop.disabled = false;
+        isScanning = true;
+        
+        codeReader = new BrowserMultiFormatReader();
+        const hints = new Map();
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]);
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        codeReader.setHints(hints);
+
+        const videoConstraints = { 
+          facingMode: 'environment', 
+          width: { ideal: 1920 }, 
+          height: { ideal: 1080 }
+        };
+        
+        scanStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+        els.video.srcObject = scanStream;
+        await els.video.play();
+
+        // Escaneo continuo rápido
+        const scanLoop = async () => {
+          if (!isScanning) return;
+          
+          try {
+            const result = await codeReader.decodeFromVideoElement(els.video);
+            if (result?.text) {
+              processScan(result.text);
+            }
+          } catch (e) {
+            // Sin código detectado - continuar
+          }
+          
+          if (isScanning) {
+            setTimeout(scanLoop, 200); // Intentar cada 200ms
+          }
+        };
+        
+        scanLoop();
+        setStatus('🔍 Detectando PDF417...', 'success');
+      } catch (err) {
+        console.error(err);
+        setStatus('❌ Error cámara. Verifica permisos.', 'error');
+        els.start.disabled = false;
+        els.stop.disabled = true;
+        isScanning = false;
+      }
+    };
+
+    const stopCamera = () => {
+      isScanning = false;
+      
+      if (scanStream) {
+        scanStream.getTracks().forEach(track => track.stop());
+        scanStream = null;
+      }
+      
+      if (codeReader) {
+        codeReader.reset();
+        codeReader = null;
+      }
+      
+      els.video.srcObject = null;
+      els.start.disabled = false;
+      els.stop.disabled = true;
+      setStatus('⏹ Cámara detenida', '');
+    };
+
+    const setStatus = (msg, type = '') => {
+      els.status.textContent = msg;
+      els.status.className = `status ${type}`;
+    };
+
+    // Nueva lectura
+    els.newScan.addEventListener('click', () => {
+      els.result.style.display = 'none';
+      setStatus('🔍 Listo para siguiente...', 'success');
+      els.video.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // Copiar datos
+    document.getElementById('btnCopy').addEventListener('click', () => {
+      navigator.clipboard.writeText(els.rawData.textContent);
+      toast('📋 Datos copiados', 'success');
+    });
+
+    // Export CSV
+    const exportCSV = () => {
+      if (!records.length) return toast('⚠️ Sin registros', 'error');
+      
+      const headers = ['Fecha', 'Número', 'Nombres', 'Apellidos', 'Fecha Nac.', 'Lugar Nac.', 'Estatura', 'GS RH', 'Sexo', 'Fecha Exp.', 'Lugar Exp.'];
+      const rows = records.map(r => [
+        `"${r.timestamp}"`, `"${r.fields.numeroIdentidad}"`, `"${r.fields.nombres}"`,
+        `"${r.fields.apellidos}"`, `"${r.fields.fechaNacimiento}"`, `"${r.fields.lugarNacimiento}"`,
+        `"${r.fields.estatura}"`, `"${r.fields.gsRh}"`, `"${r.fields.sexo}"`,
+        `"${r.fields.fechaExpedicion}"`, `"${r.fields.lugarExpedicion}"`
+      ]);
+      
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `cedulas_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast('⬇ CSV descargado', 'success');
+    };
+
+    // Listeners
+    els.start.addEventListener('click', initCamera);
+    els.stop.addEventListener('click', stopCamera);
+    els.clear.addEventListener('click', () => { 
+      if (confirm('¿Eliminar TODOS los registros?')) { 
+        records = []; 
+        localStorage.setItem('cedula_records', JSON.stringify(records));
+        updateRecordsUI(); 
+        toast('Todos eliminados', 'success');
+      } 
+    });
+    els.export.addEventListener('click', exportCSV);
+    window.addEventListener('beforeunload', stopCamera);
+
+    // Init
+    updateRecordsUI();
   </script>
 </body>
 </html>
