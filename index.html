@@ -6,6 +6,7 @@
   <title>Scanner PDF417 · Cédula CO</title>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
   <style>
     :root {
       --bg: #f5f7fa;
@@ -74,6 +75,16 @@
     #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 8px; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 999; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
 
+    .mode-selector { display: flex; gap: 10px; margin-bottom: 12px; }
+    .mode-btn { flex: 1; padding: 10px; border: 2px solid var(--border); background: white; border-radius: 8px; cursor: pointer; font-weight: 500; transition: 0.2s; }
+    .mode-btn.active { border-color: var(--primary); background: var(--primary); color: white; }
+    .mode-btn:hover:not(.active) { border-color: var(--primary); }
+
+    .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; flex: 1; }
+    .file-input-wrapper input[type=file] { position: absolute; left: -9999px; }
+    .file-input-label { display: block; padding: 12px; background: var(--primary); color: white; text-align: center; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+    .file-input-label:hover { background: var(--primary-hover); }
+
     @media (max-width: 600px) {
       .result-grid { grid-template-columns: 1fr 1fr; }
       .controls { flex-direction: column; }
@@ -85,8 +96,8 @@
 <body>
   <div class="app">
     <header>
-      <h1>🔬 PDF417 Scanner</h1>
-      <p>Cédula colombiana</p>
+      <h1>🔬 Scanner Cédula</h1>
+      <p>OCR + PDF417</p>
     </header>
 
     <nav class="tabs">
@@ -96,20 +107,47 @@
 
     <section id="lectura" class="tab-content active">
       <div class="camera-wrapper">
-        <div id="scanner-container">
-          <video id="qr-video" autoplay playsinline muted></video>
-          <div class="scan-overlay"><div class="scan-line"></div></div>
-          <div id="loading" class="loading-overlay hidden">
-            <div>
-              <div style="font-size: 2rem; margin-bottom: 8px;">📷</div>
-              <div>Detectando...</div>
-              <div style="font-size: 0.8rem; margin-top: 4px; opacity: 0.8;">Alinea el código PDF417 aquí</div>
+        <!-- Selector de modo -->
+        <div class="mode-selector">
+          <button class="mode-btn active" onclick="setMode('camera')">📷 Cámara</button>
+          <button class="mode-btn" onclick="setMode('photo')">📸 Foto/Galería</button>
+        </div>
+
+        <!-- Modo Cámara (PDF417) -->
+        <div id="camera-mode">
+          <div id="scanner-container">
+            <video id="qr-video" autoplay playsinline muted></video>
+            <div class="scan-overlay"><div class="scan-line"></div></div>
+            <div id="loading" class="loading-overlay hidden">
+              <div>
+                <div style="font-size: 2rem; margin-bottom: 8px;">📷</div>
+                <div>Detectando...</div>
+                <div style="font-size: 0.8rem; margin-top: 4px; opacity: 0.8;">Alinea el código PDF417 aquí</div>
+              </div>
             </div>
           </div>
+          <div class="controls">
+            <button id="btn-start" class="btn btn-primary">▶ Iniciar</button>
+            <button id="btn-stop" class="btn btn-danger" disabled>■ Detener</button>
+          </div>
         </div>
-        <div class="controls">
-          <button id="btn-start" class="btn btn-primary">▶ Iniciar</button>
-          <button id="btn-stop" class="btn btn-danger" disabled>■ Detener</button>
+
+        <!-- Modo Foto (OCR) -->
+        <div id="photo-mode" style="display:none;">
+          <div class="file-input-wrapper">
+            <input type="file" id="cedulaFile" accept="image/*" capture="environment">
+            <label for="cedulaFile" class="file-input-label">
+              📸 Tomar/Subir Foto de Cédula
+            </label>
+          </div>
+          <div id="ocr-progress" style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-radius: 8px; display: none; text-align: center;">
+            <div style="font-size: 1.5rem; margin-bottom: 8px;">🤖</div>
+            <div id="ocr-text">Analizando imagen...</div>
+          </div>
+        </div>
+
+        <!-- Botón NUEVA LECTURA -->
+        <div class="controls" style="margin-top: 16px;">
           <button id="btn-new" class="btn btn-warning" style="display:none;">🔄 NUEVA LECTURA</button>
         </div>
       </div>
@@ -166,8 +204,10 @@
   <script>
     let codeReader = null;
     let isScanning = false;
+    let currentMode = 'camera';
     let records = JSON.parse(localStorage.getItem('cedula_records')) || [];
     let lastRawData = '';
+    let lastScanData = null;
 
     const els = {
       btnStart: document.getElementById('btn-start'),
@@ -181,7 +221,12 @@
       count: document.getElementById('count'),
       toast: document.getElementById('toast'),
       tabs: document.querySelectorAll('.tab'),
-      tabContents: document.querySelectorAll('.tab-content')
+      tabContents: document.querySelectorAll('.tab-content'),
+      cameraMode: document.getElementById('camera-mode'),
+      photoMode: document.getElementById('photo-mode'),
+      ocrProgress: document.getElementById('ocr-progress'),
+      ocrText: document.getElementById('ocr-text'),
+      cedulaFile: document.getElementById('cedulaFile')
     };
 
     // Tabs
@@ -194,6 +239,22 @@
       });
     });
 
+    // Cambiar modo
+    window.setMode = function(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      if (mode === 'camera') {
+        els.cameraMode.style.display = 'block';
+        els.photoMode.style.display = 'none';
+      } else {
+        els.cameraMode.style.display = 'none';
+        els.photoMode.style.display = 'block';
+        stopScanner();
+      }
+    };
+
     // Controles
     document.getElementById('btn-start').addEventListener('click', startScanner);
     document.getElementById('btn-stop').addEventListener('click', stopScanner);
@@ -202,12 +263,87 @@
     document.getElementById('btn-export').addEventListener('click', exportCSV);
     document.getElementById('btn-clear').addEventListener('click', clearRecords);
 
+    // Procesar archivo OCR
+    els.cedulaFile.addEventListener('change', async (e) => {
+      if (!e.target.files || !e.target.files[0]) return;
+      const file = e.target.files[0];
+      
+      els.ocrProgress.style.display = 'block';
+      els.ocrText.textContent = '⏳ Cargando modelo de IA...';
+      
+      try {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        
+        img.onload = async () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            els.ocrText.textContent = '🤖 Analizando texto... 0%';
+            
+            const {  { text } } = await Tesseract.recognize(
+              canvas.toDataURL(),
+              'spa',
+              {
+                logger: m => {
+                  if (m.status === 'recognizing') {
+                    const prog = Math.round(m.progress * 100);
+                    els.ocrText.textContent = `🤖 ${prog}% — Leyendo...`;
+                  }
+                }
+              }
+            );
+            
+            URL.revokeObjectURL(url);
+            
+            console.log('Texto OCR:', text);
+            analizarCedulaOCR(text);
+            
+          } catch (err) {
+            console.error(err);
+            els.ocrText.textContent = '⚠ Error: ' + err.message;
+            els.ocrText.style.color = 'var(--danger)';
+          }
+        };
+        
+        img.onerror = () => {
+          els.ocrText.textContent = '⚠ Error al cargar imagen';
+          els.ocrText.style.color = 'var(--danger)';
+        };
+        
+        img.src = url;
+        
+      } catch (err) {
+        console.error(err);
+        els.ocrText.textContent = '❌ Error: ' + err.message;
+        els.ocrText.style.color = 'var(--danger)';
+      }
+    });
+
     // NUEVA LECTURA - Reset completo
     function nuevaLectura() {
+      // Ocultar resultado
       els.result.classList.remove('visible');
       els.btnNew.style.display = 'none';
       document.getElementById('raw-debug').classList.remove('show');
-      if (currentMode === 'camera') startScanner();
+      
+      // Limpiar progreso OCR
+      els.ocrProgress.style.display = 'none';
+      els.ocrText.textContent = 'Analizando imagen...';
+      els.ocrText.style.color = 'var(--text)';
+      
+      // Resetear input file
+      els.cedulaFile.value = '';
+      
+      // Si estamos en modo cámara, reiniciar
+      if (currentMode === 'camera') {
+        startScanner();
+      }
+      
       showToast('🔄 Listo para nueva lectura');
     }
 
@@ -266,7 +402,7 @@
       els.btnStop.disabled = true;
       
       let msg = '⚠️ No se pudo acceder a la cámara.';
-      if (err.name === 'NotAllowedError') msg = '⚠️ Permiso denegado. Verifica los permisos del navegador.';
+      if (err.name === 'NotAllowedError') msg = '⚠️ Permiso denegado.';
       else if (err.name === 'NotFoundError') msg = '⚠️ No se detectó cámara.';
       else if (location.protocol !== 'https:' && location.hostname !== 'localhost') 
         msg = '⚠️ Requiere HTTPS o localhost';
@@ -275,36 +411,130 @@
     }
 
     // ══════════════════════════════════════════════════
-    // PARSER CORREGIDO - FORMATO OFICIAL REGISTRADURÍA
+    // OCR - PROCESAR CÉDULA CON TESSERACT
     // ══════════════════════════════════════════════════
-    
+
+    function analizarCedulaOCR(texto) {
+      const clean = texto.toUpperCase().replace(/[^\w\s.,-]/g, ' ').trim();
+      
+      console.log('Texto limpio OCR:', clean);
+      
+      let cedula = '';
+      let nombre = '';
+      let apellido = '';
+      let fechaNac = '';
+      let lugarNac = '';
+      
+      // Buscar "No. CÉDULA: 1234567890"
+      let match = clean.match(/NO\.?\s*C[ÉE]DULA[:\s]+(\d{1,3}[\.\s]?\d{1,3}[\.\s]?\d{1,3}[\.\s]?\d{1,4})/);
+      if (match) {
+        cedula = match[1].replace(/[.\s]/g, '');
+      }
+      
+      // Buscar número largo como cédula
+      if (!cedula) {
+        const numeros = clean.match(/\d{6,12}/g);
+        if (numeros) {
+          cedula = numeros.sort((a, b) => b.length - a.length)[0];
+        }
+      }
+      
+      // Buscar "APELLIDO: XXX NOMBRE: YYY"
+      match = clean.match(/APELLIDO[:\s]+([A-ZÁÉÍÓÚÑ\s]+?)\s+NOMBRE[:\s]+([A-ZÁÉÍÓÚÑ\s]+)/);
+      if (match) {
+        apellido = match[1].trim();
+        nombre = match[2].trim();
+      }
+      
+      // Buscar "FECHA NAC" o "FECHA NACIMIENTO"
+      match = clean.match(/FECHA\s*NAC(?:IMIENTO)?[:\s]+(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/);
+      if (match) {
+        fechaNac = match[1];
+      }
+      
+      // Buscar "LUGAR NAC"
+      match = clean.match(/LUGAR\s*NAC(?:IMIENTO)?[:\s]+([A-ZÁÉÍÓÚÑ\s,]+)/);
+      if (match) {
+        lugarNac = match[1].trim();
+      }
+      
+      // Si no encuentra patrón específico, tomar primeras palabras
+      if (!apellido && !nombre) {
+        const palabras = clean.split(/\s+/).filter(p => p.length > 2 && !/^\d+$/.test(p));
+        if (palabras.length >= 3) {
+          apellido = palabras[0] + ' ' + palabras[1];
+          nombre = palabras.slice(2, 4).join(' ');
+        }
+      }
+      
+      // Llenar campos
+      document.getElementById('r-tipo').textContent = 'CC';
+      document.getElementById('r-cedula').textContent = cedula || 'N/A';
+      document.getElementById('r-nombres').textContent = nombre || 'N/A';
+      document.getElementById('r-apellidos').textContent = apellido || 'N/A';
+      document.getElementById('r-nacimiento').textContent = fechaNac || 'N/A';
+      document.getElementById('r-lug-nac').textContent = lugarNac || 'N/A';
+      document.getElementById('r-sexo').textContent = 'N/A';
+      document.getElementById('r-estatura').textContent = 'N/A';
+      document.getElementById('r-rh').textContent = 'N/A';
+      document.getElementById('r-fecha-exp').textContent = 'N/A';
+      document.getElementById('r-lug-exp').textContent = 'N/A';
+      document.getElementById('timestamp').textContent = `🕒 ${new Date().toLocaleString()}`;
+      
+      // Guardar datos
+      lastScanData = {
+        tipoDocumento: 'CC',
+        cedula: cedula || '',
+        nombres: nombre || '',
+        apellidos: apellido || '',
+        fechaNacimiento: fechaNac || '',
+        lugarNacimiento: lugarNac || '',
+        sexo: '',
+        estatura: '',
+        rh: '',
+        fechaExpedicion: '',
+        lugarExpedicion: '',
+        timestamp: new Date().toLocaleString(),
+        raw: texto
+      };
+      
+      els.result.classList.add('visible');
+      els.btnNew.style.display = 'block';
+      els.ocrProgress.style.display = 'none';
+      
+      // Guardar en registros
+      if (cedula) {
+        records.unshift(lastScanData);
+        localStorage.setItem('cedula_records', JSON.stringify(records));
+        renderRecords();
+      }
+      
+      showToast('✅ Cédula leída con OCR');
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    }
+
+    // ══════════════════════════════════════════════════
+    // PDF417 - PARSER
+    // ══════════════════════════════════════════════════
+
     function parseCedulaColombiana(rawText) {
       console.log('=== RAW PDF417 ===');
       console.log(rawText);
       
       try {
-        // 1. Limpiar caracteres de control y normalizar espacios
-        let text = rawText
-          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
-          .replace(/\r\n/g, ' ')
-          .replace(/\r/g, ' ')
-          .replace(/\n/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        let text = rawText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
         
-        console.log('Texto normalizado:', text);
-        
-        // 2. Separar por @ (delimitador oficial) o detectar estructura
-        let fields = [];
-        if (text.includes('@')) {
-          fields = text.split('@').map(f => f.trim()).filter(f => f.length > 0);
-        } else {
-          // Formato sin @: CO CC CEDULA APELL1 APELL2 NOMB1 NOMB2 FECNAC SEXO EST RH LUGNAC FECEXP LUGEXP
-          fields = extractFieldsSmart(text);
+        let delimiter = '@';
+        const delimiters = ['@', '|', '~', '\n', '#', ';'];
+        for (let d of delimiters) {
+          if ((text.match(new RegExp('\\' + d, 'g')) || []).length > 3) {
+            delimiter = d;
+            break;
+          }
         }
-        
-        console.log('Fields detectados:', fields);
 
+        let fields = text.split(delimiter).map(f => f.trim()).filter(f => f.length > 0 && !/^[\x00-\x1F]*$/.test(f));
+        
         const result = {
           tipoDocumento: 'CC',
           cedula: '',
@@ -320,190 +550,92 @@
           timestamp: new Date().toLocaleString()
         };
 
-        // 3. Buscar marcador CO (Colombia)
-        const coIndex = fields.findIndex(f => f.toUpperCase() === 'CO');
+        const patterns = {
+          fecha: /^\d{8}$/,
+          cedula: /^\d{7,10}$/,
+          rh: /^[A-ZO][+-]$/i,
+          sexo: /^[MF]$/i,
+          estatura: /^\d{2,3}$/
+        };
+
+        const coIndex = fields.findIndex(f => f === 'CO' || f.toUpperCase() === 'CO');
         
-        if (coIndex !== -1 && fields.length >= coIndex + 13) {
-          // ✅ FORMATO ESTÁNDAR: CO@TIPO@CEDULA@APELL1@APELL2@NOMB1@NOMB2@FECNAC@SEXO@EST@RH@LUGNAC@FECEXP@LUGEXP
-          console.log('✅ Detectado formato estándar CO');
-          
+        if (coIndex !== -1 && fields.length > coIndex + 10) {
           result.tipoDocumento = fields[coIndex + 1] || 'CC';
           result.cedula = fields[coIndex + 2] || '';
           
-          // Apellidos: campos 3 y 4 después de CO
-          result.apellidos = `${fields[coIndex + 3] || ''} ${fields[coIndex + 4] || ''}`.trim();
+          let nameStart = coIndex + 3;
+          let firstDateIndex = fields.findIndex((f, i) => i > nameStart && patterns.fecha.test(f.replace(/\D/g, '')));
+          if (firstDateIndex === -1) firstDateIndex = fields.length;
           
-          // Nombres: campos 5 y 6 después de CO
-          result.nombres = `${fields[coIndex + 5] || ''} ${fields[coIndex + 6] || ''}`.trim();
-          
-          // Fecha nacimiento (YYYYMMDD → DD/MM/YYYY)
-          if (fields[coIndex + 7]) {
-            result.fechaNacimiento = formatDateDMY(fields[coIndex + 7]);
+          const nameFields = fields.slice(nameStart, firstDateIndex);
+          if (nameFields.length >= 2) {
+            result.apellidos = `${nameFields[0] || ''} ${nameFields[1] || ''}`.trim();
+            result.nombres = nameFields.slice(2).join(' ').trim();
           }
           
-          // Sexo: M = Masculino, F = Femenino
-          const sexoField = fields[coIndex + 8];
-          if (sexoField) {
-            result.sexo = sexoField.toUpperCase() === 'M' ? 'Masculino' : 
-                         sexoField.toUpperCase() === 'F' ? 'Femenino' : sexoField;
+          if (fields[firstDateIndex] && patterns.fecha.test(fields[firstDateIndex])) {
+            result.fechaNacimiento = formatDateDMY(fields[firstDateIndex]);
           }
           
-          // Estatura: número en cm
-          const estField = fields[coIndex + 9];
-          if (estField && /^\d+$/.test(estField)) {
-            result.estatura = estField + ' cm';
+          const sexoField = fields[firstDateIndex + 1];
+          if (sexoField && patterns.sexo.test(sexoField)) {
+            result.sexo = sexoField.toUpperCase() === 'M' ? 'Masculino' : 'Femenino';
           }
           
-          // RH: A+, O-, etc.
-          const rhField = fields[coIndex + 10];
-          if (rhField && /^[A-ZO][+-]?$/i.test(rhField)) {
+          const estaturaField = fields[firstDateIndex + 2];
+          if (estaturaField && patterns.estatura.test(estaturaField)) {
+            result.estatura = estaturaField + ' cm';
+          }
+          
+          const rhField = fields[firstDateIndex + 3];
+          if (rhField && (patterns.rh.test(rhField) || /^[A-ZO][+-]?$/i.test(rhField))) {
             result.rh = rhField.toUpperCase();
           }
           
-          // Lugar de nacimiento
-          const lugNacField = fields[coIndex + 11];
-          if (lugNacField && !/^\d+$/.test(lugNacField)) {
+          const lugNacField = fields[firstDateIndex + 4];
+          if (lugNacField && !patterns.rh.test(lugNacField)) {
             result.lugarNacimiento = cleanText(lugNacField);
           }
           
-          // Fecha de expedición
-          if (fields[coIndex + 12]) {
-            result.fechaExpedicion = formatDateDMY(fields[coIndex + 12]);
+          const fechaExpIndex = firstDateIndex + 5;
+          if (fields[fechaExpIndex] && patterns.fecha.test(fields[fechaExpIndex])) {
+            result.fechaExpedicion = formatDateDMY(fields[fechaExpIndex]);
           }
           
-          // Lugar de expedición
-          if (fields[coIndex + 13]) {
-            result.lugarExpedicion = cleanText(fields[coIndex + 13]);
+          const lugExpField = fields[fechaExpIndex + 1];
+          if (lugExpField) {
+            result.lugarExpedicion = cleanText(lugExpField);
           }
-          
-        } else {
-          // Formato alternativo: buscar por patrones
-          console.log('🔍 Usando extracción por patrones');
-          extractByPatterns(text, result);
         }
 
-        // 4. Limpieza final de textos
         result.nombres = cleanText(result.nombres);
         result.apellidos = cleanText(result.apellidos);
         result.lugarNacimiento = cleanText(result.lugarNacimiento);
         result.lugarExpedicion = cleanText(result.lugarExpedicion);
         
-        // 5. Validar resultado mínimo
         const isValid = result.cedula && (result.nombres || result.apellidos);
-        
-        console.log('=== RESULTADO FINAL ===');
-        console.log(result);
         
         return { valid: isValid, ...result, raw: rawText };
         
       } catch (error) {
-        console.error('❌ Error en parsing:', error);
+        console.error('Error parsing:', error);
         return { valid: false, raw: rawText, error: error.message };
       }
     }
 
-    // Extraer campos cuando no hay delimitador @
-    function extractFieldsSmart(text) {
-      const fields = [];
-      
-      // Buscar CO al inicio
-      if (text.toUpperCase().includes('CO')) {
-        const coIdx = text.toUpperCase().indexOf('CO');
-        fields.push('CO');
-        text = text.substring(coIdx + 2).trim();
-      }
-      
-      // Dividir manteniendo números largos juntos y palabras en mayúscula
-      const tokens = text.match(/CO|CC|TI|CE|PA|\d{6,}|[A-ZÁÉÍÓÚÑ]{2,}(?=\s|$)|[A-Z][a-z]+/gi) || [];
-      
-      tokens.forEach(token => {
-        const clean = token.trim();
-        if (clean.length > 0) fields.push(clean);
-      });
-      
-      return fields;
-    }
-
-    // Extracción por patrones cuando el formato no es estándar
-    function extractByPatterns(text, result) {
-      const clean = text.replace(/[\x00-\x1F]/g, ' ').replace(/\s+/g, ' ').trim();
-      
-      // Buscar cédula: 10 dígitos que empiecen con 1 (formato colombiano)
-      const cedulaMatch = clean.match(/\b(1\d{9})\b/);
-      if (cedulaMatch) result.cedula = cedulaMatch[1];
-      
-      // Buscar fecha nacimiento: YYYYMMDD
-      const fechaMatch = clean.match(/\b(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\b/);
-      if (fechaMatch) result.fechaNacimiento = formatDateDMY(fechaMatch[0]);
-      
-      // Buscar nombres/apellidos después de la cédula
-      if (result.cedula) {
-        const idx = clean.indexOf(result.cedula);
-        if (idx !== -1) {
-          const despues = clean.substring(idx + result.cedula.length);
-          // Extraer palabras en mayúscula (nombres típicos)
-          const palabras = despues.match(/[A-ZÁÉÍÓÚÑ]{2,}(?=\s|$)/g) || [];
-          if (palabras.length >= 4) {
-            result.apellidos = `${palabras[0]} ${palabras[1]}`;
-            result.nombres = `${palabras[2]} ${palabras[3]}`;
-          } else if (palabras.length >= 2) {
-            result.apellidos = palabras[0];
-            result.nombres = palabras.slice(1).join(' ');
-          }
-        }
-      }
-      
-      // Buscar ciudad de nacimiento
-      const ciudades = ['BOGOTA', 'MEDELLIN', 'CALI', 'BARRANQUILLA', 'CARTAGENA', 'BUCARAMANGA', 'PEREIRA', 'MANIZALES'];
-      for (let ciudad of ciudades) {
-        if (clean.includes(ciudad)) {
-          result.lugarNacimiento = ciudad;
-          break;
-        }
-      }
-      
-      // Buscar sexo
-      if (/\bM\b/.test(clean) && !/\bMAY\b/.test(clean)) result.sexo = 'Masculino';
-      else if (/\bF\b/.test(clean)) result.sexo = 'Femenino';
-      
-      // Buscar RH
-      const rhMatch = clean.match(/\b(A|B|AB|O)[+-]\b/);
-      if (rhMatch) result.rh = rhMatch[0];
-      
-      // Buscar estatura
-      const estMatch = clean.match(/\b(\d{2,3})\s*(?=cm|\s|$)/);
-      if (estMatch) result.estatura = estMatch[1] + ' cm';
-    }
-
-    // Limpiar texto: mantener solo letras, números, espacios y acentos
     function cleanText(text) {
       if (!text) return '';
-      return text
-        .replace(/[^\w\sáéíóúÁÉÍÓÚñÑ\-\.]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      return text.replace(/[^\w\sáéíóúÁÉÍÓÚñÑ\-\.]/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
-    // Formatear fecha: YYYYMMDD o DDMMYYYY → DD/MM/YYYY
     function formatDateDMY(dateStr) {
       if (!dateStr) return '';
       const clean = dateStr.replace(/\D/g, '');
-      
       if (clean.length === 8) {
-        // Intentar YYYYMMDD primero
-        let year = clean.substring(0, 4);
-        let month = clean.substring(4, 6);
-        let day = clean.substring(6, 8);
-        
-        if (year >= '1900' && year <= '2100' && month >= '01' && month <= '12' && day >= '01' && day <= '31') {
-          return `${day}/${month}/${year}`;
-        }
-        
-        // Intentar DDMMYYYY
-        day = clean.substring(0, 2);
-        month = clean.substring(2, 4);
-        year = clean.substring(4, 8);
-        
+        const year = clean.substring(0, 4);
+        const month = clean.substring(4, 6);
+        const day = clean.substring(6, 8);
         if (year >= '1900' && year <= '2100' && month >= '01' && month <= '12' && day >= '01' && day <= '31') {
           return `${day}/${month}/${year}`;
         }
@@ -519,14 +651,13 @@
       if (!data.valid) {
         showError('❌ Formato no reconocido');
         const debugEl = document.getElementById('raw-debug');
-        debugEl.textContent = '🔍 Datos crudos:\n' + rawText.substring(0, 400);
+        debugEl.textContent = '🔍 Datos crudos:\n' + rawText.substring(0, 300);
         debugEl.classList.add('show');
         els.result.classList.add('visible');
         els.btnNew.style.display = 'block';
         return;
       }
 
-      // Llenar campos en el DOM
       document.getElementById('r-tipo').textContent = data.tipoDocumento || 'CC';
       document.getElementById('r-cedula').textContent = data.cedula || 'N/A';
       document.getElementById('r-nombres').textContent = data.nombres || 'N/A';
@@ -544,7 +675,7 @@
       els.result.classList.add('visible');
       els.btnNew.style.display = 'block';
       
-      // Guardar en registros
+      lastScanData = data;
       records.unshift(data);
       localStorage.setItem('cedula_records', JSON.stringify(records));
       renderRecords();
