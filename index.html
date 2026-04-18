@@ -3,100 +3,110 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Escáner Cédula Colombia - PDF417</title>
+  <title>Scanner PDF417 · Cédula CO</title>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
   <style>
     :root {
+      --bg: #f5f7fa;
+      --card: #ffffff;
       --primary: #0056b3;
+      --primary-hover: #004494;
       --success: #28a745;
       --danger: #dc3545;
-      --warning: #ffc107;
+      --text: #212529;
+      --text-muted: #6c757d;
+      --border: #dee2e6;
+      --shadow: 0 4px 12px rgba(0,0,0,0.08);
+      --radius: 12px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
-    body { background: #f5f7fa; color: #212529; padding: 16px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 16px; }
     .app { max-width: 800px; margin: 0 auto; }
-    
-    header { text-align: center; margin-bottom: 20px; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    header h1 { color: var(--primary); font-size: 1.8rem; margin-bottom: 8px; }
-    header p { color: #6c757d; font-size: 0.9rem; }
+    header { text-align: center; margin-bottom: 16px; }
+    header h1 { font-size: 1.5rem; color: var(--primary); }
+    header p { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
 
-    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-    .tab { flex: 1; padding: 14px; border: none; background: white; cursor: pointer; font-weight: 600; border-radius: 10px; transition: 0.3s; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--card); padding: 4px; border-radius: var(--radius); box-shadow: var(--shadow); }
+    .tab { flex: 1; padding: 12px; border: none; background: transparent; cursor: pointer; font-weight: 500; border-radius: 8px; transition: 0.2s; font-size: 0.9rem; }
     .tab.active { background: var(--primary); color: white; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; animation: fadeIn 0.3s; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .tab-content { display: none; animation: fadeIn 0.3s; }
+    .tab-content.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-    .camera-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 16px; }
-    #scanner-wrapper { position: relative; width: 100%; height: 350px; background: #000; border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
-    #qr-video { width: 100%; height: 100%; object-fit: cover; }
-    .scan-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; height: 120px; border: 3px solid rgba(0, 255, 136, 0.6); border-radius: 8px; pointer-events: none; }
-    .scan-guide::before { content: "📷 Alinea el PDF417 aquí"; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); color: #00ff88; font-size: 0.85rem; white-space: nowrap; }
-    
-    .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-    .btn { padding: 14px 20px; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: 0.3s; font-size: 0.95rem; }
+    .camera-wrapper { background: var(--card); padding: 16px; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; }
+    #scanner-container { position: relative; width: 100%; min-height: 320px; background: #111; border-radius: 8px; overflow: hidden; }
+    #qr-video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+    .scan-overlay { position: absolute; inset: 0; pointer-events: none; border: 2px solid rgba(255,255,255,0.2); }
+    .scan-line { position: absolute; top: 40%; left: 10%; right: 10%; height: 2px; background: #00ff88; box-shadow: 0 0 10px #00ff88; animation: scan 2s infinite ease-in-out; }
+    @keyframes scan { 0%,100% { top: 40%; } 50% { top: 60%; } }
+    .loading-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.9rem; z-index: 2; transition: opacity 0.3s; }
+    .hidden { opacity: 0; pointer-events: none; }
+
+    .controls { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .btn { padding: 12px 16px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; flex: 1; min-width: 120px; font-size: 0.9rem; }
     .btn-primary { background: var(--primary); color: white; }
-    .btn-primary:hover { background: #004494; }
+    .btn-primary:hover { background: var(--primary-hover); }
     .btn-danger { background: var(--danger); color: white; }
-    .btn-danger:hover { background: #c82333; }
     .btn-success { background: var(--success); color: white; }
-    .btn-success:hover { background: #218838; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    .result-card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 16px; display: none; }
-    .result-card.visible { display: block; animation: slideIn 0.4s; }
-    @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    
-    .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #e9ecef; }
-    .result-header h2 { color: var(--success); font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
-    .result-time { color: #6c757d; font-size: 0.9rem; }
+    .result-card { background: var(--card); padding: 16px; border-radius: var(--radius); box-shadow: var(--shadow); display: none; margin-top: 16px; }
+    .result-card.visible { display: block; animation: fadeIn 0.3s; }
+    .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+    .field { background: #f8f9fa; padding: 10px; border-radius: 8px; }
+    .field-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .field-value { font-size: 0.95rem; font-weight: 600; margin-top: 4px; word-break: break-word; }
+    .raw-debug { margin-top: 12px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; font-size: 0.75rem; word-break: break-all; display: none; }
+    .raw-debug.show { display: block; }
 
-    .data-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-    .data-field { background: #f8f9fa; padding: 16px; border-radius: 10px; border-left: 4px solid var(--primary); }
-    .data-label { font-size: 0.75rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600; }
-    .data-value { font-size: 1.1rem; color: #212529; font-weight: 600; word-break: break-word; line-height: 1.4; }
+    .records-wrapper { background: var(--card); padding: 16px; border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; }
+    .records-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 650px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    th { background: #f8f9fa; position: sticky; top: 0; font-weight: 600; }
+    .btn-sm { padding: 6px 10px; font-size: 0.75rem; }
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 0.9rem; }
 
-    .records-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .records-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-    table { width: 100%; border-collapse: collapse; overflow-x: auto; display: block; }
-    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-size: 0.9rem; }
-    th { background: #f8f9fa; font-weight: 600; color: #495057; position: sticky; top: 0; }
-    tr:hover { background: #f8f9fa; }
-    .empty-state { text-align: center; padding: 40px; color: #6c757d; }
-
-    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: #333; color: white; padding: 12px 24px; border-radius: 8px; opacity: 0; transition: 0.3s; z-index: 9999; }
-    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 8px; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 999; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
 
     @media (max-width: 600px) {
-      .data-grid { grid-template-columns: 1fr; }
-      .controls { grid-template-columns: 1fr; }
-      table { font-size: 0.8rem; }
-      th, td { padding: 8px; }
+      .result-grid { grid-template-columns: 1fr 1fr; }
+      .controls { flex-direction: column; }
+      table { min-width: auto; font-size: 0.8rem; }
+      th, td { padding: 8px 6px; }
     }
   </style>
 </head>
 <body>
   <div class="app">
     <header>
-      <h1>🔍 Escáner Cédula Colombia</h1>
-      <p>Decodificación PDF417 • Parser inteligente</p>
+      <h1>🔬 PDF417 Scanner</h1>
+      <p>Cédula colombiana</p>
     </header>
 
     <nav class="tabs">
       <button class="tab active" data-tab="lectura">📷 Escáner</button>
-      <button class="tab" data-tab="registros">📋 Registros (<span id="count">0</span>)</button>
+      <button class="tab" data-tab="registros">📋 Registros <span id="count">0</span></button>
     </nav>
 
-    <!-- TAB LECTURA -->
     <section id="lectura" class="tab-content active">
-      <div class="camera-container">
-        <div id="scanner-wrapper">
+      <div class="camera-wrapper">
+        <div id="scanner-container">
           <video id="qr-video" autoplay playsinline muted></video>
-          <div class="scan-guide"></div>
+          <div class="scan-overlay"><div class="scan-line"></div></div>
+          <div id="loading" class="loading-overlay hidden">
+            <div>
+              <div style="font-size: 2rem; margin-bottom: 8px;">📷</div>
+              <div>Detectando...</div>
+              <div style="font-size: 0.8rem; margin-top: 4px; opacity: 0.8;">Alinea el código PDF417 aquí</div>
+            </div>
+          </div>
         </div>
         <div class="controls">
-          <button id="btn-start" class="btn btn-primary">▶ Iniciar Lectura</button>
+          <button id="btn-start" class="btn btn-primary">▶ Iniciar</button>
           <button id="btn-stop" class="btn btn-danger" disabled>■ Detener</button>
           <button id="btn-new" class="btn btn-success" style="display:none;">🔄 Nueva Lectura</button>
         </div>
@@ -104,104 +114,65 @@
 
       <div id="result" class="result-card">
         <div class="result-header">
-          <h2>✅ Cédula Decodificada</h2>
-          <span class="result-time" id="timestamp"></span>
+          <h3>✅ Resultado</h3>
+          <span id="timestamp" class="field-label"></span>
         </div>
-        <div class="data-grid">
-          <div class="data-field">
-            <div class="data-label">Tipo Documento</div>
-            <div class="data-value" id="r-tipo">-</div>
-          </div>
-          <div class="data-field">
-            <div class="data-label">Número Cédula</div>
-            <div class="data-value" id="r-cedula">-</div>
-          </div>
-          <div class="data-field" style="grid-column: 1 / -1;">
-            <div class="data-label">Nombres</div>
-            <div class="data-value" id="r-nombres">-</div>
-          </div>
-          <div class="data-field" style="grid-column: 1 / -1;">
-            <div class="data-label">Apellidos</div>
-            <div class="data-value" id="r-apellidos">-</div>
-          </div>
-          <div class="data-field">
-            <div class="data-label">Fecha Nacimiento</div>
-            <div class="data-value" id="r-nacimiento">-</div>
-          </div>
-          <div class="data-field">
-            <div class="data-label">Sexo</div>
-            <div class="data-value" id="r-sexo">-</div>
-          </div>
-          <div class="data-field">
-            <div class="data-label">Estatura</div>
-            <div class="data-value" id="r-estatura">-</div>
-          </div>
-          <div class="data-field">
-            <div class="data-label">Grupo Sanguíneo (RH)</div>
-            <div class="data-value" id="r-rh">-</div>
-          </div>
-          <div class="data-field">
-            <div class="data-label">Lugar Nacimiento</div>
-            <div class="data-value" id="r-lugar-nac">-</div>
-          </div>
-          <div class="data-field">
-            <div class="data-label">Fecha Expedición</div>
-            <div class="data-value" id="r-fecha-exp">-</div>
-          </div>
-          <div class="data-field">
-            <div class="data-label">Lugar Expedición</div>
-            <div class="data-value" id="r-lugar-exp">-</div>
-          </div>
+        <div class="result-grid">
+          <div class="field"><div class="field-label">Tipo Documento</div><div class="field-value" id="r-tipo">-</div></div>
+          <div class="field"><div class="field-label">Número Cédula</div><div class="field-value" id="r-cedula">-</div></div>
+          <div class="field"><div class="field-label">Nombres</div><div class="field-value" id="r-nombres">-</div></div>
+          <div class="field"><div class="field-label">Apellidos</div><div class="field-value" id="r-apellidos">-</div></div>
+          <div class="field"><div class="field-label">Fecha Nacimiento</div><div class="field-value" id="r-nacimiento">-</div></div>
+          <div class="field"><div class="field-label">Lugar Nacimiento</div><div class="field-value" id="r-lug-nac">-</div></div>
+          <div class="field"><div class="field-label">Sexo</div><div class="field-value" id="r-sexo">-</div></div>
+          <div class="field"><div class="field-label">Estatura</div><div class="field-value" id="r-estatura">-</div></div>
+          <div class="field"><div class="field-label">RH</div><div class="field-value" id="r-rh">-</div></div>
+          <div class="field"><div class="field-label">Fecha Expedición</div><div class="field-value" id="r-fecha-exp">-</div></div>
+          <div class="field"><div class="field-label">Lugar Expedición</div><div class="field-value" id="r-lug-exp">-</div></div>
         </div>
+        <div id="raw-debug" class="raw-debug"></div>
       </div>
     </section>
 
-    <!-- TAB REGISTROS -->
     <section id="registros" class="tab-content">
-      <div class="records-container">
+      <div class="records-wrapper">
         <div class="records-header">
-          <h3>📂 Historial de Escaneos</h3>
+          <h3>📋 PDF417</h3>
           <div style="display:flex; gap:8px;">
-            <button id="btn-export" class="btn btn-primary" style="padding:10px 16px; font-size:0.85rem;">⬇ Excel</button>
-            <button id="btn-clear" class="btn btn-danger" style="padding:10px 16px; font-size:0.85rem;">🗑 Limpiar</button>
+            <button id="btn-copy" class="btn btn-primary btn-sm">📋 Copiar</button>
+            <button id="btn-export" class="btn btn-success btn-sm">⬇ Excel</button>
+            <button id="btn-clear" class="btn btn-danger btn-sm">🗑 Limpiar</button>
           </div>
-        </div>
-        <div id="empty-state" class="empty-state">
-          <p style="font-size: 3rem; margin-bottom: 10px;">📋</p>
-          <p>No hay registros aún.<br>Escanea una cédula para comenzar.</p>
         </div>
         <table id="records-table" style="display:none;">
           <thead>
-            <tr>
-              <th>Cédula</th>
-              <th>Nombres</th>
-              <th>Apellidos</th>
-              <th>F. Nacimiento</th>
-              <th>RH</th>
-              <th>Fecha Escaneo</th>
-              <th>Acción</th>
-            </tr>
+            <tr><th>Cédula</th><th>Nombres</th><th>Apellidos</th><th>F. Nac.</th><th>RH</th><th>Fecha</th><th>Acción</th></tr>
           </thead>
           <tbody id="records-body"></tbody>
         </table>
+        <div id="empty-state" class="empty-state">
+          <div style="font-size: 2rem; margin-bottom: 8px;">📋</div>
+          <div>No hay registros aún.</div>
+          <div style="font-size: 0.85rem; margin-top: 4px;">Escanea una cédula para comenzar.</div>
+        </div>
       </div>
     </section>
   </div>
 
-  <div id="toast" class="toast"></div>
+  <div id="toast"></div>
 
   <script>
-    // === ESTADO GLOBAL ===
     let codeReader = null;
     let isScanning = false;
     let records = JSON.parse(localStorage.getItem('cedula_records')) || [];
+    let lastRawData = '';
 
-    // === ELEMENTOS DOM ===
     const els = {
       btnStart: document.getElementById('btn-start'),
       btnStop: document.getElementById('btn-stop'),
       btnNew: document.getElementById('btn-new'),
       result: document.getElementById('result'),
+      loading: document.getElementById('loading'),
       recordsBody: document.getElementById('records-body'),
       emptyState: document.getElementById('empty-state'),
       recordsTable: document.getElementById('records-table'),
@@ -211,40 +182,36 @@
       tabContents: document.querySelectorAll('.tab-content')
     };
 
-    // === INICIALIZACIÓN ===
-    function init() {
-      setupTabs();
-      setupControls();
-      renderRecords();
-    }
-
-    function setupTabs() {
-      els.tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          els.tabs.forEach(t => t.classList.remove('active'));
-          els.tabContents.forEach(c => c.classList.remove('active'));
-          tab.classList.add('active');
-          document.getElementById(tab.dataset.tab).classList.add('active');
-        });
+    // Tabs
+    els.tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        els.tabs.forEach(t => t.classList.remove('active'));
+        els.tabContents.forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
       });
-    }
+    });
 
-    function setupControls() {
-      els.btnStart.addEventListener('click', startScanner);
-      els.btnStop.addEventListener('click', stopScanner);
-      els.btnNew.addEventListener('click', resetScan);
-      document.getElementById('btn-export').addEventListener('click', exportCSV);
-      document.getElementById('btn-clear').addEventListener('click', clearRecords);
-    }
+    // Controles
+    document.getElementById('btn-start').addEventListener('click', startScanner);
+    document.getElementById('btn-stop').addEventListener('click', stopScanner);
+    document.getElementById('btn-new').addEventListener('click', () => {
+      els.result.classList.remove('visible');
+      els.btnNew.style.display = 'none';
+      document.getElementById('raw-debug').classList.remove('show');
+      startScanner();
+    });
+    document.getElementById('btn-copy').addEventListener('click', copyRawData);
+    document.getElementById('btn-export').addEventListener('click', exportCSV);
+    document.getElementById('btn-clear').addEventListener('click', clearRecords);
 
-    // === ESCÁNER ZXING ===
     async function startScanner() {
       if (isScanning) return;
-      
       els.btnStart.disabled = true;
       els.btnStop.disabled = false;
       els.btnNew.style.display = 'none';
       els.result.classList.remove('visible');
+      els.loading.classList.remove('hidden');
 
       try {
         const hints = new Map();
@@ -255,16 +222,18 @@
         const videoEl = document.getElementById('qr-video');
 
         await codeReader.decodeFromConstraints(
-          { video: { facingMode: "environment", width: { ideal: 1920 } } },
+          { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },
           videoEl,
           (result, err) => {
             if (result) onScanSuccess(result.getText());
           }
         );
 
-        if (videoEl.paused) await videoEl.play();
+        if (videoEl.paused) await videoEl.play().catch(() => {});
+        
         isScanning = true;
-        showToast('📷 Cámara activa - Alinea el PDF417');
+        els.loading.classList.add('hidden');
+        showToast('📷 Cámara activa');
       } catch (err) {
         handleError(err);
       }
@@ -276,6 +245,7 @@
       isScanning = false;
       els.btnStart.disabled = false;
       els.btnStop.disabled = true;
+      els.loading.classList.add('hidden');
       
       const videoEl = document.getElementById('qr-video');
       if (videoEl.srcObject) {
@@ -285,256 +255,275 @@
       showToast('🛑 Cámara detenida');
     }
 
-    function resetScan() {
-      els.result.classList.remove('visible');
-      els.btnNew.style.display = 'none';
-      startScanner();
-    }
-
     function handleError(err) {
+      els.loading.classList.add('hidden');
       isScanning = false;
       els.btnStart.disabled = false;
       els.btnStop.disabled = true;
       
-      let msg = '⚠️ Error de cámara';
-      if (err.name === 'NotAllowedError') msg = '⚠️ Permiso denegado';
+      let msg = '⚠️ No se pudo acceder a la cámara.';
+      if (err.name === 'NotAllowedError') msg = '⚠️ Permiso denegado. Verifica los permisos del navegador.';
+      else if (err.name === 'NotFoundError') msg = '⚠️ No se detectó cámara.';
       else if (location.protocol !== 'https:' && location.hostname !== 'localhost') 
         msg = '⚠️ Requiere HTTPS o localhost';
       
-      showToast(msg);
+      showError(msg);
     }
 
     // === PARSER MEJORADO CON DECODIFICACIÓN CORRECTA ===
-function parseCedulaColombiana(rawText) {
-  console.log('=== RAW RECIBIDO ===');
-  console.log(rawText);
-  console.log('===================');
-  
-  try {
-    // 1. Limpiar y normalizar el texto
-    let text = rawText
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '') // Eliminar caracteres de control
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      .trim();
+    function parseCedulaColombiana(rawText) {
+      console.log('=== RAW RECIBIDO ===');
+      console.log(rawText);
+      console.log('===================');
+      
+      try {
+        // 1. Limpiar y normalizar el texto
+        let text = rawText
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          .trim();
 
-    // 2. Detectar delimitador principal
-    let delimiter = '@';
-    const delimiters = ['@', '|', '~', '\n', '#', ';'];
-    for (let d of delimiters) {
-      if ((text.match(new RegExp('\\' + d, 'g')) || []).length > 3) {
-        delimiter = d;
-        break;
+        // 2. Detectar delimitador principal
+        let delimiter = '@';
+        const delimiters = ['@', '|', '~', '\n', '#', ';'];
+        for (let d of delimiters) {
+          if ((text.match(new RegExp('\\' + d, 'g')) || []).length > 3) {
+            delimiter = d;
+            break;
+          }
+        }
+
+        // 3. Dividir campos
+        let fields = text.split(delimiter)
+          .map(f => f.trim())
+          .filter(f => f.length > 0 && !/^[\x00-\x1F]*$/.test(f));
+
+        console.log('Fields detectados:', fields.length, fields);
+
+        // 4. Inicializar resultado
+        const result = {
+          tipoDocumento: 'CC',
+          cedula: '',
+          nombres: '',
+          apellidos: '',
+          fechaNacimiento: '',
+          sexo: '',
+          estatura: '',
+          rh: '',
+          lugarNacimiento: '',
+          fechaExpedicion: '',
+          lugarExpedicion: '',
+          timestamp: new Date().toLocaleString()
+        };
+
+        // 5. Patrones de búsqueda
+        const patterns = {
+          fecha: /^\d{8}$/,
+          cedula: /^\d{7,10}$/,
+          rh: /^[A-ZO][+-]$/i,
+          sexo: /^[MF]$/i,
+          estatura: /^\d{2,3}$/,
+          codigoMunicipio: /^\d{6}$/
+        };
+
+        // 6. Buscar índice de "CO"
+        const coIndex = fields.findIndex(f => f === 'CO' || f.toUpperCase() === 'CO');
+        
+        if (coIndex !== -1 && fields.length > coIndex + 10) {
+          console.log('Detectado formato estándar CO');
+          
+          result.tipoDocumento = fields[coIndex + 1] || 'CC';
+          result.cedula = fields[coIndex + 2] || '';
+          
+          let nameStart = coIndex + 3;
+          
+          let firstDateIndex = fields.findIndex((f, i) => 
+            i > nameStart && patterns.fecha.test(f.replace(/\D/g, ''))
+          );
+          
+          if (firstDateIndex === -1) firstDateIndex = fields.length;
+          
+          const nameFields = fields.slice(nameStart, firstDateIndex);
+          
+          if (nameFields.length >= 2) {
+            result.apellidos = `${nameFields[0] || ''} ${nameFields[1] || ''}`.trim();
+            result.nombres = nameFields.slice(2).join(' ').trim();
+          }
+          
+          if (fields[firstDateIndex] && patterns.fecha.test(fields[firstDateIndex])) {
+            result.fechaNacimiento = formatDateDMY(fields[firstDateIndex]);
+          }
+          
+          const sexoField = fields[firstDateIndex + 1];
+          if (sexoField && patterns.sexo.test(sexoField)) {
+            result.sexo = sexoField.toUpperCase() === 'M' ? 'Masculino' : 'Femenino';
+          }
+          
+          const estaturaField = fields[firstDateIndex + 2];
+          if (estaturaField && patterns.estatura.test(estaturaField)) {
+            result.estatura = estaturaField + ' cm';
+          }
+          
+          const rhField = fields[firstDateIndex + 3];
+          if (rhField && (patterns.rh.test(rhField) || /^[A-ZO][+-]?$/i.test(rhField))) {
+            result.rh = rhField.toUpperCase();
+          }
+          
+          const lugNacField = fields[firstDateIndex + 4];
+          if (lugNacField && !patterns.rh.test(lugNacField)) {
+            result.lugarNacimiento = cleanText(lugNacField);
+          }
+          
+          const fechaExpIndex = firstDateIndex + 5;
+          if (fields[fechaExpIndex] && patterns.fecha.test(fields[fechaExpIndex])) {
+            result.fechaExpedicion = formatDateDMY(fields[fechaExpIndex]);
+          }
+          
+          const lugExpField = fields[fechaExpIndex + 1];
+          if (lugExpField) {
+            result.lugarExpedicion = cleanText(lugExpField);
+          }
+          
+        } else {
+          console.log('Usando búsqueda por patrones');
+          
+          const cedulaIdx = fields.findIndex(f => patterns.cedula.test(f));
+          if (cedulaIdx !== -1) {
+            result.cedula = fields[cedulaIdx];
+          }
+          
+          const fechasIdx = fields.map((f, i) => 
+            patterns.fecha.test(f) ? i : -1
+          ).filter(i => i !== -1);
+          
+          if (fechasIdx.length > 0) {
+            result.fechaNacimiento = formatDateDMY(fields[fechasIdx[0]]);
+          }
+          if (fechasIdx.length > 1) {
+            result.fechaExpedicion = formatDateDMY(fields[fechasIdx[1]]);
+          }
+          
+          const rhIdx = fields.findIndex(f => patterns.rh.test(f));
+          if (rhIdx !== -1) {
+            result.rh = fields[rhIdx].toUpperCase();
+          }
+          
+          const sexoIdx = fields.findIndex(f => patterns.sexo.test(f));
+          if (sexoIdx !== -1) {
+            result.sexo = fields[sexoIdx].toUpperCase() === 'M' ? 'Masculino' : 'Femenino';
+          }
+          
+          const textFields = fields.filter(f => 
+            /[A-Za-zÁÉÍÓÚáéíóúÑñ]/.test(f) && 
+            f.length > 2 && 
+            !patterns.fecha.test(f) &&
+            !patterns.cedula.test(f) &&
+            !patterns.rh.test(f) &&
+            f.toUpperCase() !== 'CO'
+          );
+          
+          if (textFields.length >= 2) {
+            const mid = Math.ceil(textFields.length / 2);
+            result.apellidos = textFields.slice(0, mid).join(' ');
+            result.nombres = textFields.slice(mid).join(' ');
+          }
+        }
+
+        result.nombres = cleanText(result.nombres);
+        result.apellidos = cleanText(result.apellidos);
+        result.lugarNacimiento = cleanText(result.lugarNacimiento);
+        result.lugarExpedicion = cleanText(result.lugarExpedicion);
+        
+        const isValid = result.cedula && (result.nombres || result.apellidos);
+        
+        console.log('=== RESULTADO ===');
+        console.log(result);
+        console.log('================');
+        
+        return {
+          valid: isValid,
+          ...result,
+          raw: rawText
+        };
+        
+      } catch (error) {
+        console.error('Error en parsing:', error);
+        return { valid: false, raw: rawText, error: error.message };
       }
     }
 
-    // 3. Dividir campos
-    let fields = text.split(delimiter)
-      .map(f => f.trim())
-      .filter(f => f.length > 0 && !/^[\x00-\x1F]*$/.test(f));
-
-    console.log('Fields detectados:', fields.length, fields);
-
-    // 4. Inicializar resultado
-    const result = {
-      tipoDocumento: 'CC',
-      cedula: '',
-      nombres: '',
-      apellidos: '',
-      fechaNacimiento: '',
-      sexo: '',
-      estatura: '',
-      rh: '',
-      lugarNacimiento: '',
-      fechaExpedicion: '',
-      lugarExpedicion: '',
-      timestamp: new Date().toLocaleString()
-    };
-
-    // 5. Patrones de búsqueda
-    const patterns = {
-      fecha: /^\d{8}$/,           // YYYYMMDD
-      cedula: /^\d{7,10}$/,        // 7-10 dígitos
-      rh: /^[A-ZO][+-]$/i,         // A+, O-, etc.
-      sexo: /^[MF]$/i,             // M o F
-      estatura: /^\d{2,3}$/,       // 2-3 dígitos (cm)
-      codigoMunicipio: /^\d{6}$/   // 6 dígitos
-    };
-
-    // 6. Buscar índice de "CO" (indicador de Colombia)
-    const coIndex = fields.findIndex(f => f === 'CO' || f.toUpperCase() === 'CO');
-    
-    if (coIndex !== -1 && fields.length > coIndex + 10) {
-      // Formato estándar Registraduría: CO@TIPO@CEDULA@...
-      console.log('Detectado formato estándar CO');
-      
-      result.tipoDocumento = fields[coIndex + 1] || 'CC';
-      result.cedula = fields[coIndex + 2] || '';
-      
-      // Apellidos y nombres (pueden estar en diferentes posiciones)
-      let nameStart = coIndex + 3;
-      
-      // Buscar fechas para determinar dónde terminan los nombres
-      let firstDateIndex = fields.findIndex((f, i) => 
-        i > nameStart && patterns.fecha.test(f.replace(/\D/g, ''))
-      );
-      
-      if (firstDateIndex === -1) firstDateIndex = fields.length;
-      
-      // Extraer nombres y apellidos del bloque
-      const nameFields = fields.slice(nameStart, firstDateIndex);
-      
-      // Asumir: primeros 2 campos = apellidos, siguientes = nombres
-      if (nameFields.length >= 2) {
-        result.apellidos = `${nameFields[0] || ''} ${nameFields[1] || ''}`.trim();
-        result.nombres = nameFields.slice(2).join(' ').trim();
-      }
-      
-      // Fecha de nacimiento
-      if (fields[firstDateIndex] && patterns.fecha.test(fields[firstDateIndex])) {
-        result.fechaNacimiento = formatDateDMY(fields[firstDateIndex]);
-      }
-      
-      // Sexo
-      const sexoField = fields[firstDateIndex + 1];
-      if (sexoField && patterns.sexo.test(sexoField)) {
-        result.sexo = sexoField.toUpperCase() === 'M' ? 'Masculino' : 'Femenino';
-      }
-      
-      // Estatura
-      const estaturaField = fields[firstDateIndex + 2];
-      if (estaturaField && patterns.estatura.test(estaturaField)) {
-        result.estatura = estaturaField + ' cm';
-      }
-      
-      // RH
-      const rhField = fields[firstDateIndex + 3];
-      if (rhField && (patterns.rh.test(rhField) || /^[A-ZO][+-]?$/i.test(rhField))) {
-        result.rh = rhField.toUpperCase();
-      }
-      
-      // Lugar de nacimiento (código o nombre)
-      const lugNacField = fields[firstDateIndex + 4];
-      if (lugNacField && !patterns.rh.test(lugNacField)) {
-        result.lugarNacimiento = cleanText(lugNacField);
-      }
-      
-      // Fecha de expedición
-      const fechaExpIndex = firstDateIndex + 5;
-      if (fields[fechaExpIndex] && patterns.fecha.test(fields[fechaExpIndex])) {
-        result.fechaExpedicion = formatDateDMY(fields[fechaExpIndex]);
-      }
-      
-      // Lugar de expedición
-      const lugExpField = fields[fechaExpIndex + 1];
-      if (lugExpField) {
-        result.lugarExpedicion = cleanText(lugExpField);
-      }
-      
-    } else {
-      // Formato alternativo: buscar por patrones
-      console.log('Usando búsqueda por patrones');
-      
-      // Buscar cédula
-      const cedulaIdx = fields.findIndex(f => patterns.cedula.test(f));
-      if (cedulaIdx !== -1) {
-        result.cedula = fields[cedulaIdx];
-      }
-      
-      // Buscar fechas
-      const fechasIdx = fields.map((f, i) => 
-        patterns.fecha.test(f) ? i : -1
-      ).filter(i => i !== -1);
-      
-      if (fechasIdx.length > 0) {
-        result.fechaNacimiento = formatDateDMY(fields[fechasIdx[0]]);
-      }
-      if (fechasIdx.length > 1) {
-        result.fechaExpedicion = formatDateDMY(fields[fechasIdx[1]]);
-      }
-      
-      // Buscar RH
-      const rhIdx = fields.findIndex(f => patterns.rh.test(f));
-      if (rhIdx !== -1) {
-        result.rh = fields[rhIdx].toUpperCase();
-      }
-      
-      // Buscar sexo
-      const sexoIdx = fields.findIndex(f => patterns.sexo.test(f));
-      if (sexoIdx !== -1) {
-        result.sexo = fields[sexoIdx].toUpperCase() === 'M' ? 'Masculino' : 'Femenino';
-      }
-      
-      // Extraer texto legible para nombres/apellidos
-      const textFields = fields.filter(f => 
-        /[A-Za-zÁÉÍÓÚáéíóúÑñ]/.test(f) && 
-        f.length > 2 && 
-        !patterns.fecha.test(f) &&
-        !patterns.cedula.test(f) &&
-        !patterns.rh.test(f) &&
-        f.toUpperCase() !== 'CO'
-      );
-      
-      if (textFields.length >= 2) {
-        // Asumir primeros = apellidos, últimos = nombres
-        const mid = Math.ceil(textFields.length / 2);
-        result.apellidos = textFields.slice(0, mid).join(' ');
-        result.nombres = textFields.slice(mid).join(' ');
-      }
+    function cleanText(text) {
+      if (!text) return '';
+      return text
+        .replace(/[^\w\sáéíóúÁÉÍÓÚñÑ\-\.]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
     }
 
-    // 7. Limpieza final
-    result.nombres = cleanText(result.nombres);
-    result.apellidos = cleanText(result.apellidos);
-    result.lugarNacimiento = cleanText(result.lugarNacimiento);
-    result.lugarExpedicion = cleanText(result.lugarExpedicion);
-    
-    // 8. Validar
-    const isValid = result.cedula && (result.nombres || result.apellidos);
-    
-    console.log('=== RESULTADO ===');
-    console.log(result);
-    console.log('================');
-    
-    return {
-      valid: isValid,
-      ...result,
-      raw: rawText
-    };
-    
-  } catch (error) {
-    console.error('Error en parsing:', error);
-    return { valid: false, raw: rawText, error: error.message };
-  }
-}
-
-// Función auxiliar para limpiar texto
-function cleanText(text) {
-  if (!text) return '';
-  return text
-    .replace(/[^\w\sáéíóúÁÉÍÓÚñÑ\-\.]/g, ' ')  // Eliminar caracteres especiales
-    .replace(/\s+/g, ' ')                       // Multiple espacios -> uno
-    .trim();
-}
-
-// Función auxiliar para formatear fecha YYYYMMDD -> DD/MM/YYYY
-function formatDateDMY(dateStr) {
-  if (!dateStr) return '';
-  const clean = dateStr.replace(/\D/g, '');
-  if (clean.length === 8) {
-    const year = clean.substring(0, 4);
-    const month = clean.substring(4, 6);
-    const day = clean.substring(6, 8);
-    
-    // Validar rango razonable
-    if (year >= '1900' && year <= '2100' && 
-        month >= '01' && month <= '12' && 
-        day >= '01' && day <= '31') {
-      return `${day}/${month}/${year}`;
+    function formatDateDMY(dateStr) {
+      if (!dateStr) return '';
+      const clean = dateStr.replace(/\D/g, '');
+      if (clean.length === 8) {
+        const year = clean.substring(0, 4);
+        const month = clean.substring(4, 6);
+        const day = clean.substring(6, 8);
+        
+        if (year >= '1900' && year <= '2100' && 
+            month >= '01' && month <= '12' && 
+            day >= '01' && day <= '31') {
+          return `${day}/${month}/${year}`;
+        }
+      }
+      return dateStr;
     }
-  }
-  return dateStr;
-}
+
+    function onScanSuccess(rawText) {
+      stopScanner();
+      lastRawData = rawText;
+      const data = parseCedulaColombiana(rawText);
+      
+      if (!data.valid) {
+        showError('❌ Formato no reconocido');
+        const debugEl = document.getElementById('raw-debug');
+        debugEl.textContent = '🔍 Datos crudos:\n' + rawText.substring(0, 300);
+        debugEl.classList.add('show');
+        els.result.classList.add('visible');
+        return;
+      }
+
+      document.getElementById('r-tipo').textContent = data.tipoDocumento || 'CC';
+      document.getElementById('r-cedula').textContent = data.cedula || 'N/A';
+      document.getElementById('r-nombres').textContent = data.nombres || 'N/A';
+      document.getElementById('r-apellidos').textContent = data.apellidos || 'N/A';
+      document.getElementById('r-nacimiento').textContent = data.fechaNacimiento || 'N/A';
+      document.getElementById('r-lug-nac').textContent = data.lugarNacimiento || 'N/A';
+      document.getElementById('r-sexo').textContent = data.sexo || 'N/A';
+      document.getElementById('r-estatura').textContent = data.estatura || 'N/A';
+      document.getElementById('r-rh').textContent = data.rh || 'N/A';
+      document.getElementById('r-fecha-exp').textContent = data.fechaExpedicion || 'N/A';
+      document.getElementById('r-lug-exp').textContent = data.lugarExpedicion || 'N/A';
+      document.getElementById('timestamp').textContent = `🕒 ${data.timestamp}`;
+      
+      document.getElementById('raw-debug').classList.remove('show');
+      els.result.classList.add('visible');
+      
+      records.unshift(data);
+      localStorage.setItem('cedula_records', JSON.stringify(records));
+      renderRecords();
+      
+      els.btnNew.style.display = 'block';
+      showToast('✅ Cédula decodificada');
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    }
+
+    function copyRawData() {
+      if (!lastRawData) return showError('⚠️ Sin datos para copiar');
+      navigator.clipboard.writeText(lastRawData).then(() => {
+        showToast('📋 Datos copiados');
+      });
+    }
+
     function renderRecords() {
       els.recordsBody.innerHTML = '';
       els.count.textContent = records.length;
@@ -554,10 +543,10 @@ function formatDateDMY(dateStr) {
           <td><strong>${r.cedula}</strong></td>
           <td>${r.nombres}</td>
           <td>${r.apellidos}</td>
-          <td>${r.nacimiento}</td>
+          <td>${r.fechaNacimiento}</td>
           <td>${r.rh}</td>
           <td>${r.timestamp.split(' ')[0]}</td>
-          <td><button class="btn btn-danger" style="padding:6px 10px; font-size:0.8rem;" onclick="deleteRecord(${i})">🗑</button></td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteRecord(${i})">🗑</button></td>
         `;
         els.recordsBody.appendChild(tr);
       });
@@ -567,25 +556,24 @@ function formatDateDMY(dateStr) {
       records.splice(idx, 1);
       localStorage.setItem('cedula_records', JSON.stringify(records));
       renderRecords();
-      showToast('🗑 Registro eliminado');
+      showToast('🗑 Eliminado');
     };
 
     function clearRecords() {
-      if (confirm('¿Eliminar todos los registros?')) {
-        records = [];
-        localStorage.setItem('cedula_records', JSON.stringify(records));
-        renderRecords();
-        showToast('🗑 Historial limpiado');
-      }
+      if (!confirm('¿Eliminar todos los registros?')) return;
+      records = [];
+      localStorage.setItem('cedula_records', JSON.stringify(records));
+      renderRecords();
+      showToast('🗑 Registros limpiados');
     }
 
     function exportCSV() {
-      if (records.length === 0) return showToast('⚠️ Sin datos');
+      if (records.length === 0) return showError('⚠️ Sin datos');
       
-      const headers = ['Tipo','Cédula','Nombres','Apellidos','F.Nacimiento','Lugar Nac.','Sexo','Estatura','RH','F.Expedición','Lugar Exp.','Fecha Escaneo'];
+      const headers = ['Tipo','Cédula','Nombres','Apellidos','F.Nacimiento','Lugar Nac.','Sexo','Estatura','RH','F.Expedición','Lugar Exp.','Fecha'];
       const rows = records.map(r => [
-        r.tipo, r.cedula, r.nombres, r.apellidos, r.nacimiento,
-        r.lugarNacimiento, r.sexo, r.estatura, r.rh,
+        r.tipoDocumento, r.cedula, r.nombres, r.apellidos, r.fechaNacimiento, 
+        r.lugarNacimiento, r.sexo, r.estatura, r.rh, 
         r.fechaExpedicion, r.lugarExpedicion, r.timestamp
       ]);
       
@@ -606,8 +594,9 @@ function formatDateDMY(dateStr) {
       els.toast.classList.add('show');
       setTimeout(() => els.toast.classList.remove('show'), 2500);
     }
+    function showError(msg) { showToast(msg); }
 
-    init();
+    renderRecords();
   </script>
 </body>
 </html>
