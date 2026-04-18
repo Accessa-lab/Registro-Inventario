@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Escáner Cédula Colombia | ZXing PDF417</title>
+  <!-- ZXing Official UMD Builds -->
   <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
   <style>
@@ -50,7 +51,6 @@
     .field { background: #f8f9fa; padding: 10px; border-radius: 8px; }
     .field-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .field-value { font-size: 0.95rem; font-weight: 600; margin-top: 4px; word-break: break-word; }
-    .raw-debug { margin-top: 8px; font-size: 0.7rem; color: #888; word-break: break-all; background: #f1f1f1; padding: 6px; border-radius: 4px; display: none; }
 
     .records-wrapper { background: var(--card); padding: 16px; border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; }
     .records-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
@@ -75,7 +75,7 @@
   <div class="app">
     <header>
       <h1>🔍 Escáner Cédula Colombia</h1>
-      <p>Motor ZXing PDF417 • Parser robusto • Requiere HTTPS/localhost</p>
+      <p>Motor ZXing nativo • PDF417 directo • HTTPS/localhost requerido</p>
     </header>
 
     <nav class="tabs">
@@ -114,7 +114,6 @@
           <div class="field"><div class="field-label">Fecha Expedición</div><div class="field-value" id="r-fecha-exp">-</div></div>
           <div class="field"><div class="field-label">Lugar Expedición</div><div class="field-value" id="r-lug-exp">-</div></div>
         </div>
-        <div id="raw-debug" class="raw-debug"></div>
       </div>
     </section>
 
@@ -141,11 +140,13 @@
   <div id="toast"></div>
 
   <script>
+    // === ESTADO GLOBAL ===
     let codeReader = null;
     let isScanning = false;
     let records = JSON.parse(localStorage.getItem('cedula_records')) || [];
     let currentScanData = null;
 
+    // === ELEMENTOS DOM ===
     const els = {
       tabs: document.querySelectorAll('.tab'),
       tabContents: document.querySelectorAll('.tab-content'),
@@ -161,7 +162,9 @@
       toast: document.getElementById('toast')
     };
 
+    // === INICIALIZACIÓN ===
     function init() { renderRecords(); setupTabs(); setupControls(); }
+
     function setupTabs() {
       els.tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -172,6 +175,7 @@
         });
       });
     }
+
     function setupControls() {
       els.btnStart.addEventListener('click', startScanner);
       els.btnStop.addEventListener('click', stopScanner);
@@ -180,8 +184,10 @@
       document.getElementById('btn-clear').addEventListener('click', clearRecords);
     }
 
-    function startScanner() {
+    // === MOTOR ZXING - PATRÓN DE REFERENCIA ===
+    async function startScanner() {
       if (isScanning) return;
+      
       els.btnStart.disabled = true;
       els.btnStop.disabled = false;
       els.btnNew.style.display = 'none';
@@ -190,31 +196,63 @@
       currentScanData = null;
 
       try {
-        codeReader = new ZXing.BrowserPDF417Reader();
+        // 1. Configurar hints EXACTAMENTE como en la referencia
+        const hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+        // 2. Crear reader con hints
+        codeReader = new ZXing.BrowserMultiFormatReader(hints);
+
+        // 3. Obtener elemento de video
         const videoEl = document.getElementById('qr-video');
-        
-        codeReader.decodeFromConstraints(
-          { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },
-          videoEl,
-          (result, error) => {
-            if (result) onScanSuccess(result.getText());
+
+        // 4. Configuración de cámara
+        const constraints = {
+          video: {
+            facingMode: "environment",
+            width: { min: 1024, ideal: 1920 },
+            height: { min: 768, ideal: 1080 }
+          }
+        };
+
+        // 5. Iniciar decodificación DIRECTAMENTE sobre el stream de video
+        // SIN canvas, SIN setInterval, SIN preprocessing manual
+        await codeReader.decodeFromConstraints(
+          constraints,
+          videoEl,  // ← elemento <video> directamente
+          (result, err) => {
+            if (result) {
+              onScanSuccess(result.getText());
+            }
+            // NotFoundException se ignora: ZXing la lanza en cada frame sin código
           }
         );
 
-        videoEl.play().catch(() => {});
+        // Forzar reproducción (soluciona pantalla negra en algunos navegadores)
+        if (videoEl.paused) {
+          await videoEl.play().catch(() => {});
+        }
+
         isScanning = true;
         els.loading.classList.add('hidden');
         showToast('📷 Cámara activa. Alinea el PDF417 dentro del marco.');
-      } catch (err) { handleError(err); }
+
+      } catch (err) {
+        handleError(err);
+      }
     }
 
     function stopScanner() {
       if (!isScanning || !codeReader) return;
+      
       codeReader.reset();
       isScanning = false;
       els.btnStart.disabled = false;
       els.btnStop.disabled = true;
       els.loading.classList.add('hidden');
+
+      // Liberar stream de cámara explícitamente
       const videoEl = document.getElementById('qr-video');
       if (videoEl.srcObject) {
         videoEl.srcObject.getTracks().forEach(track => track.stop());
@@ -235,9 +273,15 @@
       isScanning = false;
       els.btnStart.disabled = false;
       els.btnStop.disabled = true;
-      const msg = err.name === 'NotAllowedError' 
-        ? '⚠️ Permiso de cámara denegado. Habilítalo en el navegador.' 
-        : '⚠️ No se pudo iniciar la cámara. Usa HTTPS o localhost.';
+      
+      let msg = '⚠️ No se pudo iniciar la cámara.';
+      if (err.name === 'NotAllowedError') {
+        msg = '⚠️ Permiso de cámara denegado. Habilítalo en el navegador.';
+      } else if (err.name === 'NotFoundError') {
+        msg = '⚠️ No se detectó cámara. Conecta una cámara trasera.';
+      } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        msg = '⚠️ Requiere HTTPS o localhost para acceder a la cámara.';
+      }
       showError(msg);
     }
 
@@ -306,11 +350,6 @@
       
       if (!data.valid) {
         showError('❌ Formato no reconocido. Asegura buena luz y enfoque estable.');
-        // Mostrar raw para debug si falla
-        const debugEl = document.getElementById('raw-debug');
-        debugEl.textContent = `🔍 RAW: ${rawText.replace(/\s+/g, ' ').trim()}`;
-        debugEl.style.display = 'block';
-        document.getElementById('result').classList.add('visible');
         return;
       }
 
@@ -318,7 +357,6 @@
       displayResult(data);
       saveRecord(data);
       els.btnNew.style.display = 'block';
-      document.getElementById('raw-debug').style.display = 'none';
       showToast('✅ Cédula decodificada y guardada.');
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     }
@@ -338,18 +376,24 @@
       els.result.classList.add('visible');
     }
 
+    // === GESTIÓN DE REGISTROS ===
     function saveRecord(d) {
       records.unshift(d);
       localStorage.setItem('cedula_records', JSON.stringify(records));
       renderRecords();
     }
+
     function renderRecords() {
       els.recordsBody.innerHTML = '';
       els.count.textContent = records.length;
       if (records.length === 0) {
-        els.emptyState.style.display = 'block'; els.recordsTable.style.display = 'none'; return;
+        els.emptyState.style.display = 'block';
+        els.recordsTable.style.display = 'none';
+        return;
       }
-      els.emptyState.style.display = 'none'; els.recordsTable.style.display = 'table';
+      els.emptyState.style.display = 'none';
+      els.recordsTable.style.display = 'table';
+      
       records.forEach((r, i) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -360,30 +404,44 @@
         els.recordsBody.appendChild(tr);
       });
     }
+
     window.deleteRecord = (idx) => {
       records.splice(idx, 1);
       localStorage.setItem('cedula_records', JSON.stringify(records));
       renderRecords();
       showToast('🗑 Registro eliminado.');
     };
+
     window.clearRecords = () => {
       if (!confirm('¿Eliminar todos los registros? Esta acción es irreversible.')) return;
-      records = []; localStorage.setItem('cedula_records', JSON.stringify(records));
-      renderRecords(); showToast('🗑 Historial limpiado.');
+      records = [];
+      localStorage.setItem('cedula_records', JSON.stringify(records));
+      renderRecords();
+      showToast('🗑 Historial limpiado.');
     };
+
     function exportCSV() {
       if (records.length === 0) return showToast('⚠️ No hay datos para exportar.');
       const headers = ['Cédula','Nombres','Apellidos','F. Nacimiento','Lugar Nac.','Sexo','Estatura','RH','F. Expedición','Lugar Exp.','Fecha Escaneo'];
       const rows = records.map(r => [r.cedula, r.nombres, r.apellidos, r.nacimiento, r.lugarNacimiento, r.sexo, r.estatura, r.rh, r.fechaExpedicion, r.lugarExpedicion, r.timestamp]);
       const csvContent = '\uFEFF' + [headers, ...rows].map(e => e.map(f => `"${(f||'').replace(/"/g,'""')}"`).join(',')).join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
-      link.download = `cedulas_${new Date().toISOString().slice(0,10)}.csv`; link.click();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `cedulas_${new Date().toISOString().slice(0,10)}.csv`;
+      link.click();
       showToast('⬇️ CSV descargado correctamente.');
     }
-    function showToast(msg) { els.toast.textContent = msg; els.toast.classList.add('show'); setTimeout(() => els.toast.classList.remove('show'), 2500); }
+
+    // === UTILIDADES ===
+    function showToast(msg) {
+      els.toast.textContent = msg;
+      els.toast.classList.add('show');
+      setTimeout(() => els.toast.classList.remove('show'), 2500);
+    }
     function showError(msg) { showToast(msg); }
 
+    // Iniciar app
     init();
   </script>
 </body>
