@@ -606,7 +606,25 @@ function formatDateDMY(dateStr) {
       els.toast.classList.add('show');
       setTimeout(() => els.toast.classList.remove('show'), 2500);
     }
-
+// Función para decodificar texto con diferentes codificaciones
+function decodeText(buffer) {
+  // Intentar UTF-8 primero
+  try {
+    const utf8 = new TextDecoder('utf-8').decode(buffer);
+    if (/[\w\sáéíóúÁÉÍÓÚñÑ]/.test(utf8)) {
+      return utf8;
+    }
+  } catch (e) {}
+  
+  // Intentar Latin-1 (ISO-8859-1)
+  try {
+    const latin1 = new TextDecoder('iso-8859-1').decode(buffer);
+    return latin1;
+  } catch (e) {}
+  
+  // Fallback
+  return buffer.toString();
+}
     init();
   </script>
 </body>
