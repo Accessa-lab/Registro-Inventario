@@ -102,7 +102,7 @@
           <div id="loading" class="loading-overlay hidden">
             <div>
               <div style="font-size: 2rem; margin-bottom: 8px;">📷</div>
-              <div id="loading-text">Detectando...</div>
+              <div>Detectando...</div>
               <div style="font-size: 0.8rem; margin-top: 4px; opacity: 0.8;">Alinea el código PDF417 aquí</div>
             </div>
           </div>
@@ -110,6 +110,8 @@
         <div class="controls">
           <button id="btn-start" class="btn btn-primary">▶ Iniciar</button>
           <button id="btn-stop" class="btn btn-danger" disabled>■ Detener</button>
+        </div>
+        <div class="controls" style="margin-top: 16px;">
           <button id="btn-new" class="btn btn-warning" style="display:none;">🔄 NUEVA LECTURA</button>
         </div>
       </div>
@@ -168,6 +170,7 @@
     let isScanning = false;
     let records = JSON.parse(localStorage.getItem('cedula_records')) || [];
     let lastRawData = '';
+    let lastScanData = null;
 
     const els = {
       btnStart: document.getElementById('btn-start'),
@@ -175,7 +178,6 @@
       btnNew: document.getElementById('btn-new'),
       result: document.getElementById('result'),
       loading: document.getElementById('loading'),
-      loadingText: document.getElementById('loading-text'),
       recordsBody: document.getElementById('records-body'),
       emptyState: document.getElementById('empty-state'),
       recordsTable: document.getElementById('records-table'),
@@ -203,6 +205,7 @@
     document.getElementById('btn-export').addEventListener('click', exportCSV);
     document.getElementById('btn-clear').addEventListener('click', clearRecords);
 
+    // NUEVA LECTURA
     function nuevaLectura() {
       els.result.classList.remove('visible');
       els.btnNew.style.display = 'none';
@@ -218,7 +221,6 @@
       els.btnNew.style.display = 'none';
       els.result.classList.remove('visible');
       els.loading.classList.remove('hidden');
-      els.loadingText.textContent = 'Iniciando cámara...';
 
       try {
         const hints = new Map();
@@ -341,7 +343,9 @@
           let apellido2 = fields[apellidoIndex + 1] || '';
           
           // Verificar si el segundo "apellido" es en realidad parte del nombre
+          // Si parece un nombre (más corto o común), ajustamos
           if (apellido2 && (apellido2.length < 4 || /^[AEIOU]/i.test(apellido2))) {
+            // Podría ser nombre
             result.apellidos = apellido1;
           } else {
             result.apellidos = `${apellido1} ${apellido2}`.trim();
@@ -470,6 +474,7 @@
           );
           
           if (textFields.length >= 2) {
+            // Primeros campos = apellidos, últimos = nombres
             const mid = Math.ceil(textFields.length / 2);
             result.apellidos = textFields.slice(0, mid).join(' ');
             result.nombres = textFields.slice(mid).join(' ');
@@ -514,6 +519,7 @@
       const clean = dateStr.replace(/\D/g, '');
       
       if (clean.length === 8) {
+        // Formato YYYYMMDD
         const year = clean.substring(0, 4);
         const month = clean.substring(4, 6);
         const day = clean.substring(6, 8);
@@ -524,6 +530,7 @@
           return `${day}/${month}/${year}`;
         }
       } else if (clean.length === 6) {
+        // Formato DDMMYY
         const day = clean.substring(0, 2);
         const month = clean.substring(2, 4);
         const year = '20' + clean.substring(4, 6);
@@ -568,6 +575,7 @@
       els.result.classList.add('visible');
       els.btnNew.style.display = 'block';
       
+      lastScanData = data;
       records.unshift(data);
       localStorage.setItem('cedula_records', JSON.stringify(records));
       renderRecords();
